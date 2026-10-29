@@ -20,7 +20,8 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import List
 
-from src.detection import DetectionResult, detect
+from src.detection import DetectionResult, detect_trace
+from src.detection import ner
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class SanitizeResult:
     detections: List[DetectionResult] = field(default_factory=list)
     leaked: int = 0
     latency_ms: float = 0.0
+    trace: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +47,7 @@ class SanitizeResult:
             "detections": [asdict(d) for d in self.detections],
             "leaked": self.leaked,
             "latency_ms": round(self.latency_ms, 2),
+            "trace": self.trace,
         }
 
 
@@ -75,15 +78,29 @@ def sanitize(text: str, typed: bool = True) -> SanitizeResult:
     """Detect and redact sensitive spans in *text*. Fail-closed on any error."""
     t0 = time.perf_counter()
     try:
-        detections = detect(text)
+        t = time.perf_counter()
+        model_results = ner.predict(text)
+        model_stage = {**ner.status(), "matches": len(model_results or []),
+                       "ms": (time.perf_counter() - t) * 1000}
+        detections, trace = detect_trace(text, model_results)
     except Exception as exc:  # noqa: BLE001 - fail closed on anything
         raise SanitizationError(f"detection failed: {exc}") from exc
+    t = time.perf_counter()
     sanitized = sanitize_text(text, detections, typed)
+    sanitize_ms = (time.perf_counter() - t) * 1000
+    t = time.perf_counter()
     leaked = count_leaks(sanitized, detections)
+    leak_ms = (time.perf_counter() - t) * 1000
     if leaked:
         raise SanitizationError(f"{leaked} detected value(s) survived sanitization")
+    trace.update(
+        input={"chars": len(text), "lines": text.count("\n") + 1 if text else 0},
+        model=model_stage,
+        sanitize={"replaced": len(detections), "chars_out": len(sanitized), "ms": sanitize_ms},
+        leak_check={"checked": len(detections), "leaked": leaked, "ms": leak_ms},
+    )
     return SanitizeResult(text, sanitized, detections, leaked,
-                          (time.perf_counter() - t0) * 1000)
+                          (time.perf_counter() - t0) * 1000, trace)
 
 
 def validate_action(action: dict, sanitized: str) -> bool:

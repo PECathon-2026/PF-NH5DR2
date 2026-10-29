@@ -85,7 +85,72 @@
   footer { margin-top: 20px; color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
   code { font-family: var(--mono); font-size: 12px; }
 
+  nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 18px; }
+  nav.tabs a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); }
+  nav.tabs a:hover { color: var(--ink); border-color: var(--ink); }
+
+  .section { margin-top: 40px; scroll-margin-top: 16px; }
+  .section > h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: -0.01em; }
+  .section > p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13.5px; max-width: 760px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+
+  /* live trace */
+  .chain { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .node { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; transition: border-color .3s, box-shadow .3s; }
+  .node .k span { color: var(--red); margin-right: 6px; font-family: var(--mono); }
+  .node.hot { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+  .node.off { border-style: dashed; }
+  .node .k { font: 700 10.5px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .node .v { font-size: 22px; font-weight: 700; margin: 6px 0 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .node .d { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .node .ms { font: 600 11px/1 var(--mono); color: var(--muted); margin-top: 8px; }
+  .dets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .det { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+  .det b { font-size: 11px; letter-spacing: .05em; }
+  .det.hit { border-color: var(--red); background: var(--red-soft); }
+  .det.hit b { color: var(--red); }
+  .det .m { color: var(--muted); display: block; margin-top: 2px; }
+
+  /* training */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; counter-reset: s; }
+  .step { position: relative; }
+  .step h3 { margin: 0 0 6px; font-size: 14px; }
+  .step h3::before { counter-increment: s; content: counter(s, decimal-leading-zero); color: var(--red); font: 700 11px var(--mono); margin-right: 8px; }
+  .step p { margin: 0 0 8px; color: var(--muted); font-size: 12.5px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font: 600 10.5px/1 var(--mono); padding: 4px 6px; border-radius: 5px; border: 1px solid var(--line); }
+  .chip.b { background: var(--red-soft); color: var(--red-ink); border-color: transparent; }
+  .iob { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tok { display: inline-flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: 12px var(--mono); }
+  .tok i { font: 700 9.5px var(--sans); font-style: normal; color: var(--muted); margin-top: 2px; }
+  .tok.e { border-color: var(--red); background: var(--red-soft); }
+  .tok.e i { color: var(--red); }
+  .two { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 12px; }
+  .note { border-left: 3px solid var(--red); padding: 8px 12px; background: var(--red-soft); color: var(--red-ink); border-radius: 0 8px 8px 0; font-size: 12.5px; }
+  .note.ok { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+  pre.cmd { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font: 12px var(--mono); overflow-x: auto; }
+  svg.chart text { fill: var(--muted); font: 10px var(--sans); }
+
+  /* evaluation */
+  table.m { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.m th { text-align: left; font: 700 10.5px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.m td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+  table.m tr.total td { font-weight: 700; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .bar span.t { width: 80px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; flex: none; }
+  .bar span.t i { display: block; height: 100%; background: var(--ink); }
+  .bar.low span.t i { background: var(--red); }
+  .miss { font: 11.5px var(--mono); color: var(--muted); }
+  .tablewrap { overflow-x: auto; }
+  .canary td:nth-child(2), .canary td:nth-child(3) { font: 12px var(--mono); }
+  .ok-t { color: var(--ok); font-weight: 700; }
+  .bad-t { color: var(--red); font-weight: 700; }
+
   @media (max-width: 980px) {
+    .two { grid-template-columns: 1fr; }
     .flow { grid-template-columns: 1fr; }
     .arrow { transform: rotate(90deg); height: 18px; }
     .panel { min-height: 0; }
@@ -108,7 +173,14 @@
     <div id="status" class="pill"><span class="dot"></span><span id="statusText">Connecting…</span></div>
   </header>
 
-  <section class="stats" aria-label="Summary">
+  <nav class="tabs" aria-label="Sections">
+    <a href="#demo">Live demo</a>
+    <a href="#trace">Request pipeline</a>
+    <a href="#training">Model training</a>
+    <a href="#evaluation">Evaluation</a>
+  </nav>
+
+  <section class="stats" aria-label="Summary" id="demo">
     <div class="stat"><b id="sCount">0</b><span>sensitive spans</span></div>
     <div class="stat"><b id="sTypes">—</b><span>types found</span></div>
     <div class="stat"><b id="sLatency">—</b><span>detection latency</span></div>
@@ -145,10 +217,36 @@
     </div>
   </section>
 
+  <section class="section" id="trace">
+    <h2>Request pipeline, live</h2>
+    <p class="sub">Every keystroke above goes through these stages on the server. Numbers and timings are from the request you just made.</p>
+    <div class="chain" id="chain"></div>
+    <div class="dets" id="dets"></div>
+  </section>
+
+  <section class="section" id="training">
+    <h2>How the model is trained</h2>
+    <p class="sub">The NER classifier covers what regex can't: names and context-dependent values. Every value below is read from <code>src/model/train.py</code> and <code>build_corpus.py</code> when the page loads, not typed in by hand.</p>
+    <div class="steps" id="steps"><div class="card"><span class="empty">Loading…</span></div></div>
+    <div class="two">
+      <div class="card" id="iobCard"></div>
+      <div class="card" id="runCard"></div>
+    </div>
+  </section>
+
+  <section class="section" id="evaluation">
+    <h2>Evaluation</h2>
+    <p class="sub" id="evalSub">Measured by the server at startup.</p>
+    <div class="two">
+      <div class="card tablewrap" id="evalCard"></div>
+      <div class="card tablewrap" id="canaryCard"></div>
+    </div>
+  </section>
+
   <footer>
     <span>Detection: regex + Luhn checksum, run by <span id="where">the local Python backend</span>.</span>
     <span>Types: CARD · PHONE · PAN · EMAIL · IP · URL · OTP</span>
-    <span>API: <code>POST /api/sanitize</code></span>
+    <span>API: <code>POST /api/sanitize</code> · <code>GET /api/pipeline</code></span>
   </footer>
 </div>
 
@@ -213,6 +311,7 @@ function render(res) {
   $("sLeak").textContent = `${res.leaked} / ${dets.length}`;
   $("leakStat").classList.toggle("alert", res.leaked > 0);
   $("err").hidden = true;
+  if (res.trace) renderTrace(res.trace);
   setStatus(res.leaked === 0, res.leaked === 0 ? `${WHERE} · 0 leaks` : `${res.leaked} leaked`);
 }
 
@@ -261,6 +360,154 @@ function linkHover(e, on) {
 }
 $("list").addEventListener("mouseover", (e) => linkHover(e, true));
 $("list").addEventListener("mouseout", (e) => linkHover(e, false));
+
+// ---- live request trace -------------------------------------------------
+const ms = (x) => (x == null ? "" : `${x < 0.1 ? x.toFixed(3) : x.toFixed(2)} ms`);
+
+function renderTrace(t) {
+  const det = t.detectors || [];
+  const hits = det.reduce((a, d) => a + d.matches, 0);
+  const rejected = det.reduce((a, d) => a + d.rejected, 0);
+  const patMs = det.reduce((a, d) => a + d.ms, 0);
+  const m = t.model || {};
+  const modelOn = m.state === "loaded";
+  const nodes = [
+    { k: "Input", v: `${t.input.chars}`, d: `characters, ${t.input.lines} line${t.input.lines === 1 ? "" : "s"}`, hot: t.input.chars > 0 },
+    { k: "Pattern layer", v: hits, d: `${det.length} regex + checksum detectors${rejected ? `, ${rejected} rejected by validation` : ""}`, ms: patMs, hot: hits > 0 },
+    { k: "NER model", v: modelOn ? m.matches : "off", d: modelOn ? "fine-tuned BERT token classifier" : "not deployed here, so the pattern layer serves alone", ms: modelOn ? m.ms : null, hot: modelOn && m.matches > 0, off: !modelOn },
+    { k: "Merge", v: t.merge.kept, d: `${t.merge.candidates} candidates, ${t.merge.dropped_overlap} overlap${t.merge.dropped_overlap === 1 ? "" : "s"} dropped`, ms: t.merge.ms, hot: t.merge.kept > 0 },
+    { k: "Sanitize", v: t.sanitize.replaced, d: "spans replaced with [REDACTED:TYPE]", ms: t.sanitize.ms, hot: t.sanitize.replaced > 0 },
+    { k: "Leak check", v: `${t.leak_check.leaked} leaked`, d: `output re-scanned for ${t.leak_check.checked} values; any hit blocks the response`, ms: t.leak_check.ms, hot: false },
+  ];
+  $("chain").innerHTML = nodes.map((n, i) =>
+    `<div class="node${n.hot ? " hot" : ""}${n.off ? " off" : ""}"><div class="k"><span>${i + 1}→</span>${n.k}</div><div class="v">${n.v}</div><div class="d">${esc(n.d)}</div>${n.ms != null ? `<div class="ms">${ms(n.ms)}</div>` : ""}</div>`
+  ).join("");
+  $("dets").innerHTML = det.map((d, i) =>
+    `<div class="det${d.matches ? " hit" : ""}"><b>${i + 1}. ${d.label}</b> · ${d.matches} match${d.matches === 1 ? "" : "es"}${d.rejected ? `, ${d.rejected} rejected` : ""}<span class="m">${esc(d.method)}</span></div>`
+  ).join("");
+}
+
+// ---- training + evaluation ----------------------------------------------
+const pct = (x) => `${(x * 100).toFixed(1)}%`;
+const num = (x) => (x == null ? "—" : x);
+
+function kv(rows) {
+  return `<dl class="kv">${rows.filter((r) => r[1] != null && r[1] !== "").map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+}
+
+function renderSteps(tr) {
+  const t = tr.train, c = tr.corpus, a = t.args || {};
+  const entityTypes = [...new Set(t.labels.filter((l) => l !== "O").map((l) => l.slice(2)))];
+  const steps = [
+    ["Synthetic corpus", "Faker fills sentence templates with fake but realistic values, so no real personal data is used for training.",
+      kv([["templates", c.templates.length], ["rounds", num(c.rounds)], ["sentences", num(c.planned_sentences)], ["on disk", c.generated_lines == null ? "not generated on this server" : `${c.generated_lines} lines`]]) +
+      `<div class="chips" style="margin-top:8px">${c.generators.map((g) => `<span class="chip">${g}</span>`).join("")}</div>`],
+    ["IOB2 labelling", "Every character gets a tag: B- marks the start of an entity, I- its continuation, O everything else.",
+      `<div class="chips">${t.labels.map((l) => `<span class="chip${l === "O" ? "" : " b"}">${l}</span>`).join("")}</div>`],
+    ["Tokenize + align", "Text is split into WordPiece subwords and each subword takes the tag of its first character. Padding and special tokens are masked with -100.",
+      kv([["tokenizer", esc(t.base_model || "?")], ["max_length", num(t.max_length)], ["types", entityTypes.length]])],
+    ["Fine-tune BERT", "A token-classification head is trained on top of the pre-trained encoder.",
+      kv([["base", esc(t.base_model || "?")], ["epochs", num(a.num_train_epochs)], ["learning rate", num(a.learning_rate)], ["batch", num(a.per_device_train_batch_size)], ["split", t.train_split ? `${Math.round(t.train_split * 100)}/${Math.round((1 - t.train_split) * 100)} (seed ${t.seed})` : null], ["eval every", a.eval_steps ? `${a.eval_steps} steps` : null]])],
+    ["Evaluate", "compute_metrics reports token accuracy plus entity-level precision, recall and F1 on the held-out split.",
+      kv([["metrics", "accuracy, entity P / R / F1"], ["saved to", esc(a.output_dir || "models/pii_classifier")]])],
+    ["Serve on-device", "The detection layer loads the model lazily and merges its spans with the pattern layer. Patterns win on overlap, and model spans scoring under 0.6 are ignored.",
+      `<div class="note${tr.ner.state === "loaded" ? " ok" : ""}">Model status: <b>${tr.ner.state}</b>${tr.ner.detail ? ` · ${esc(tr.ner.detail)}` : ""}</div>`],
+  ];
+  $("steps").innerHTML = steps.map(([h, p, body]) => `<div class="card step"><h3>${h}</h3><p>${p}</p>${body}</div>`).join("");
+}
+
+const SAMPLE_VALUES = { card: "4532015112830366", phone: "9876543210", otp: "482913", email: "neha@example.com",
+  pan: "ABCDE1234F", ip: "203.0.113.42", url: "https://example.com/path/4821", person: "Priya Sharma" };
+
+function renderIob(c) {
+  const tpl = c.templates.find((x) => x.includes("{{person}}")) || c.templates[0];
+  if (!tpl) { $("iobCard").innerHTML = ""; return; }
+  const spans = [];
+  let text = "";
+  tpl.split(/(\{\{\w+\}\})/).forEach((part) => {
+    const m = part.match(/^\{\{(\w+)\}\}$/);
+    if (m && SAMPLE_VALUES[m[1]]) { spans.push([text.length, text.length + SAMPLE_VALUES[m[1]].length, m[1].toUpperCase()]); text += SAMPLE_VALUES[m[1]]; }
+    else text += part;
+  });
+  const toks = [...text.matchAll(/[A-Za-z0-9@:\/+_-]+(?:\.[A-Za-z0-9@:\/+_-]+)*|[^\sA-Za-z0-9]/g)];
+  const seen = new Set();
+  const html = toks.map((m) => {
+    const s = m.index, e = s + m[0].length;
+    const sp = spans.find(([a, b]) => s < b && a < e);
+    let tag = "O";
+    if (sp) { tag = (seen.has(sp[0]) ? "I-" : "B-") + sp[2]; seen.add(sp[0]); }
+    return `<span class="tok${sp ? " e" : ""}">${esc(m[0])}<i>${tag}</i></span>`;
+  }).join("");
+  $("iobCard").innerHTML = `<h3 style="margin:0 0 4px;font-size:14px">One training example</h3>
+    <p class="miss" style="margin:0 0 8px">Template from build_corpus.py, filled with sample values. Shown at word level; training aligns these tags to BERT subwords.</p>
+    <div class="iob">${html}</div>`;
+}
+
+function lossChart(run) {
+  const tl = run.train_loss, el = run.eval.filter((e) => e.eval_loss != null).map((e) => ({ step: e.step, loss: e.eval_loss }));
+  const all = [...tl, ...el];
+  if (all.length < 2) return "";
+  const W = 420, H = 150, P = 28;
+  const maxS = Math.max(...all.map((p) => p.step)), maxL = Math.max(...all.map((p) => p.loss));
+  const x = (s) => P + (s / maxS) * (W - P - 8), y = (l) => 8 + (1 - l / maxL) * (H - P - 8);
+  const line = (pts, color, dash) => pts.length ? `<polyline fill="none" stroke="${color}" stroke-width="2" ${dash ? 'stroke-dasharray="4 3"' : ""} points="${pts.map((p) => `${x(p.step).toFixed(1)},${y(p.loss).toFixed(1)}`).join(" ")}"/>` : "";
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block" role="img" aria-label="Training and validation loss">
+    <line x1="${P}" y1="${H - P + 8}" x2="${W - 8}" y2="${H - P + 8}" stroke="var(--line)"/>
+    ${line(tl, "var(--ink)")}${line(el, "var(--red)", true)}
+    <text x="${P}" y="${H - 6}">step 0</text><text x="${W - 8}" y="${H - 6}" text-anchor="end">step ${maxS}</text>
+    <text x="${W - 8}" y="12" text-anchor="end">max loss ${maxL.toFixed(2)}</text></svg>
+    <div class="miss">— train loss &nbsp; <span style="color:var(--red)">- - validation loss</span></div>`;
+}
+
+function renderRun(tr) {
+  const run = tr.run;
+  if (!run) {
+    $("runCard").innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">Training run</h3>
+      <div class="note">No trained checkpoint on this server yet, so live detection uses the pattern layer only.</div>
+      <p class="miss" style="margin:10px 0 0">To train locally (needs torch + transformers):</p>
+      <pre class="cmd">python src/model/corpus/build_corpus.py
+python src/download_model.py
+python src/model/train.py</pre>
+      <p class="miss" style="margin:8px 0 0">Once <code>models/pii_classifier</code> has a run, this card shows its loss curve and entity F1 automatically.</p>`;
+    return;
+  }
+  const f = run.final_eval || {};
+  $("runCard").innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">Training run · ${run.global_step} steps, ${Number(run.epochs || 0).toFixed(1)} epochs</h3>
+    ${lossChart(run)}
+    ${kv([["entity F1", f.eval_entity_f1 != null ? pct(f.eval_entity_f1) : null], ["entity precision", f.eval_entity_precision != null ? pct(f.eval_entity_precision) : null], ["entity recall", f.eval_entity_recall != null ? pct(f.eval_entity_recall) : null], ["token accuracy", f.eval_accuracy != null ? pct(f.eval_accuracy) : null], ["source", esc(run.source)]])}`;
+}
+
+function bar(v) {
+  return `<span class="bar${v < 0.9 ? " low" : ""}"><span class="t"><i style="width:${(v * 100).toFixed(1)}%"></i></span>${pct(v)}</span>`;
+}
+
+function renderEval(ev) {
+  $("evalSub").textContent = `Pattern layer measured on ${ev.cases} synthetic test sentences (seed ${ev.seed}): ${ev.cases - ev.negatives.total} with one planted value each, plus ${ev.negatives.total} clean sentences that should trigger nothing. Exact-span match, ${ev.ms_per_case.toFixed(3)} ms per sentence.`;
+  const rows = Object.entries(ev.per_label).map(([lab, m]) =>
+    `<tr><td><span class="lbl">${lab}</span></td><td>${bar(m.precision)}</td><td>${bar(m.recall)}</td><td>${pct(m.f1)}</td></tr>` +
+    (m.misses.length ? `<tr><td></td><td colspan="3" class="miss">missed: ${m.misses.map((s) => `“${esc(s)}”`).join(", ")}</td></tr>` : "")
+  ).join("");
+  const o = ev.overall, n = ev.negatives;
+  $("evalCard").innerHTML = `<h3 style="margin:0 0 8px;font-size:14px">Pattern layer accuracy</h3>
+    <table class="m"><thead><tr><th>Type</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+    <tbody>${rows}<tr class="total"><td>All</td><td>${pct(o.precision)}</td><td>${pct(o.recall)}</td><td>${pct(o.f1)}</td></tr></tbody></table>
+    <p class="miss" style="margin:10px 0 0">False alarms on clean text: <b>${n.flagged}/${n.total}</b>${n.examples.length ? ` · e.g. ${n.examples.map((e) => `“${esc(e.text)}” → ${e.label}`).join(", ")}` : ""}</p>
+    <p class="miss" style="margin:6px 0 0">These misses are context-dependent cases (no keyword before an OTP, a random ID that happens to pass the card checksum). That's the gap the NER model is meant to close.</p>`;
+}
+
+function renderCanary(ca) {
+  const pass = ca.leaked === 0;
+  $("canaryCard").innerHTML = `<h3 style="margin:0 0 8px;font-size:14px">Canary leakage audit · <span class="${pass ? "ok-t" : "bad-t"}">${ca.leaked}/${ca.markers} leaked, ${pass ? "PASS" : "FAIL"}</span></h3>
+    <p class="miss" style="margin:0 0 8px">Fake canary values from <code>src/eval/canary.py</code> are planted in sentences and sent through the full sanitize step. Any value that survives counts as a leak.</p>
+    <table class="m canary"><thead><tr><th>Type</th><th>Input</th><th>Output</th><th></th></tr></thead><tbody>
+    ${ca.rows.map((r) => `<tr><td><span class="lbl">${r.kind}</span></td><td>${esc(r.input)}</td><td>${renderOutput(r.output)}</td><td class="${r.leaked ? "bad-t" : "ok-t"}">${r.leaked ? "leaked" : "safe"}</td></tr>`).join("")}
+    </tbody></table>`;
+}
+
+fetch("/api/pipeline").then((r) => r.json()).then((p) => {
+  renderSteps(p.training); renderIob(p.training.corpus); renderRun(p.training);
+  renderEval(p.evaluation); renderCanary(p.canary);
+}).catch(() => { $("steps").innerHTML = '<div class="card"><span class="err">Could not load pipeline details from the backend.</span></div>'; });
 
 fetch("/api/health").then((r) => r.ok && setStatus(true, `${WHERE} · 0 leaks`)).catch(() => setStatus(false, "Backend offline"));
 input.value = SAMPLES["Checkout form"];

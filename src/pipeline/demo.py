@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from src.pipeline import insights
 from src.pipeline.sanitize import SanitizationError, sanitize
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -45,6 +46,17 @@ def index() -> FileResponse:
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.get("/api/pipeline")
+def api_pipeline() -> dict:
+    """Training config, measured benchmark and canary audit for the 'How it works' view."""
+    return {
+        "detectors": insights.detectors_info(),
+        "training": insights.training_info(),
+        "evaluation": insights.evaluate_patterns(),
+        "canary": insights.canary_audit(),
+    }
 
 
 @app.post("/api/sanitize")
