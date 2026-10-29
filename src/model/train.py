@@ -97,25 +97,36 @@ def main():
 
     texts, labels = load_corpus("data/corpus/train.jsonl")
     
-    # Build a proper Hugging Face Dataset
-    encodings = tokenize_and_align_labels(texts, labels, tokenizer)
-    dataset = Dataset.from_dict(encodings)
+    # Split into train/val (90/10)
+    split = int(0.9 * len(texts))
+    train_texts, val_texts = texts[:split], texts[split:]
+    train_labels, val_labels = labels[:split], labels[split:]
+    
+    # Build datasets
+    train_encodings = tokenize_and_align_labels(train_texts, train_labels, tokenizer)
+    val_encodings = tokenize_and_align_labels(val_texts, val_labels, tokenizer)
+    train_dataset = Dataset.from_dict(train_encodings)
+    val_dataset = Dataset.from_dict(val_encodings)
 
     training_args = TrainingArguments(
         output_dir="./models/pii_classifier",
         num_train_epochs=3,
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
         learning_rate=2e-5,
-        logging_steps=5,
-        save_steps=50,
-        max_steps=50,
+        logging_steps=50,
+        save_steps=500,
+        eval_strategy="steps",
+        eval_steps=250,
+        max_steps=2000,
         report_to="none",
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=dataset,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
         compute_metrics=compute_metrics,
     )
 
