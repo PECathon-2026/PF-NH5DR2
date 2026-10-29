@@ -33,3 +33,7 @@ onnxruntime>=1.18.0
 pytest>=8.3.0
 # optional: for network-level canary testing
 requests>=2.32.0
+
+# Demo server
+fastapi>=0.110.0
+uvicorn>=0.29.0
