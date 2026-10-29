@@ -26,7 +26,7 @@ def run_training(corpus_path, model_output_dir):
     """Run training with current corpus."""
     import subprocess
     result = subprocess.run(
-        ["python", "-m", "src.model.train_v2"],
+        ["python", "-m", "src.model.train_v2", corpus_path],
         capture_output=True,
         text=True,
         cwd="F:/Hackthon"
@@ -133,14 +133,13 @@ def improve_accuracy():
         
         # Step 2: Train model
         print("\n[2/3] Training model...")
-        # Update train_v2.py to use this corpus
-        # For now, use existing training
-        success = run_training(corpus_path, f"models/pii_classifier_v2_{iteration}")
+        model_output = f"models/pii_classifier_v2_{iteration}"
+        success = run_training(corpus_path, model_output)
         if not success:
             print("  Training failed, skipping...")
             continue
         
-        model_path = "models/pii_classifier"  # Default output
+        model_path = model_output
         print(f"  Model saved to {model_path}")
         
         # Step 3: Evaluate

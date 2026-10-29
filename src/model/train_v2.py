@@ -123,7 +123,7 @@ def compute_metrics(eval_pred):
     }
 
 
-def main():
+def main(corpus_path="data/corpus/train.jsonl"):
     tokenizer = AutoTokenizer.from_pretrained("models/google-bert_bert-base-uncased")
     model = AutoModelForTokenClassification.from_pretrained(
         "models/google-bert_bert-base-uncased",
@@ -134,8 +134,8 @@ def main():
     model.config.hidden_dropout_prob = 0.3
     model.config.attention_probs_dropout_prob = 0.3
 
-    print("Loading corpus...")
-    texts, labels = load_corpus("data/corpus/train.jsonl")
+    print(f"Loading corpus from {corpus_path}...")
+    texts, labels = load_corpus(corpus_path)
     print(f"Loaded {len(texts)} examples")
     
     # Random split with fixed seed
@@ -200,4 +200,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    corpus_path = sys.argv[1] if len(sys.argv) > 1 else "data/corpus/train.jsonl"
+    main(corpus_path)
