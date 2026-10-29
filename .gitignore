@@ -67,10 +67,10 @@ $RECYCLE.BIN/
 *.log
 .DS_Store
 
-# Large generated artifacts (keep locally, do not push)
-/models/
-/data/corpus/
-/tmp/
+# Large generated artifacts (tracked via git-lfs)
+# /models/
+# /data/corpus/
+# /tmp/
 *.whl
 *.tar.gz
 *.zip

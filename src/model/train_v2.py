@@ -138,10 +138,12 @@ def main(corpus_path="data/corpus/train.jsonl"):
     texts, labels = load_corpus(corpus_path)
     print(f"Loaded {len(texts)} examples")
     
-    # Random split with fixed seed
+    # Use subset for quick training
     random.seed(42)
     indices = list(range(len(texts)))
     random.shuffle(indices)
+    subset_size = min(2000, len(indices))
+    indices = indices[:subset_size]
     split = int(0.9 * len(indices))
     train_idx, val_idx = indices[:split], indices[split:]
     
@@ -162,7 +164,7 @@ def main(corpus_path="data/corpus/train.jsonl"):
     # Improved training arguments
     training_args = TrainingArguments(
         output_dir="./models/pii_classifier",
-        num_train_epochs=5,
+        max_steps=500,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         learning_rate=2e-5,
