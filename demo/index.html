@@ -146,7 +146,7 @@
   </section>
 
   <footer>
-    <span>Detection: regex + Luhn checksum, run by the local Python backend.</span>
+    <span>Detection: regex + Luhn checksum, run by <span id="where">the local Python backend</span>.</span>
     <span>Types: CARD · PHONE · PAN · EMAIL · IP · URL · OTP</span>
     <span>API: <code>POST /api/sanitize</code></span>
   </footer>
@@ -161,6 +161,9 @@ const SAMPLES = {
 };
 
 const $ = (id) => document.getElementById(id);
+const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+const WHERE = LOCAL ? "Local" : "Hosted demo";
+$("where").textContent = LOCAL ? "the local Python backend" : "this demo's server (in real use it runs on-device)";
 const input = $("input");
 let lastText = null, timer = null, seq = 0, latest = null;
 
@@ -210,7 +213,7 @@ function render(res) {
   $("sLeak").textContent = `${res.leaked} / ${dets.length}`;
   $("leakStat").classList.toggle("alert", res.leaked > 0);
   $("err").hidden = true;
-  setStatus(res.leaked === 0, res.leaked === 0 ? "Local · 0 leaks" : `${res.leaked} leaked`);
+  setStatus(res.leaked === 0, res.leaked === 0 ? `${WHERE} · 0 leaks` : `${res.leaked} leaked`);
 }
 
 async function run(now) {
@@ -259,7 +262,7 @@ function linkHover(e, on) {
 $("list").addEventListener("mouseover", (e) => linkHover(e, true));
 $("list").addEventListener("mouseout", (e) => linkHover(e, false));
 
-fetch("/api/health").then((r) => r.ok && setStatus(true, "Local · 0 leaks")).catch(() => setStatus(false, "Backend offline"));
+fetch("/api/health").then((r) => r.ok && setStatus(true, `${WHERE} · 0 leaks`)).catch(() => setStatus(false, "Backend offline"));
 input.value = SAMPLES["Checkout form"];
 run(true);
 </script>
