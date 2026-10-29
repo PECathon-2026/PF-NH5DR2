@@ -29,8 +29,11 @@ def run_training(corpus_path, model_output_dir):
         ["python", "-m", "src.model.train_v2", corpus_path],
         capture_output=True,
         text=True,
-        cwd="F:/Hackthon"
+        cwd="F:/Hackthon",
+        timeout=7200  # 2 hour timeout for training
     )
+    if result.returncode != 0:
+        print(f"  Training stderr: {result.stderr[-500:]}")
     return result.returncode == 0
 
 
