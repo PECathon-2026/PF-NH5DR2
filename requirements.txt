@@ -1,0 +1,35 @@
+# PrivacyLens — PECathon 2026
+# Privacy-Preserving AI Browser Agent
+
+# Runtime / core
+torch>=2.3.0
+torchvision>=0.18.0
+transformers>=4.45.0
+huggingface_hub>=0.26.0
+accelerate>=0.34.0
+
+# Data / eval
+pandas>=2.2.0
+numpy>=2.0.0
+datasets>=2.18.0
+evaluate>=0.4.0
+scikit-learn>=1.5.0
+regex>=2024.5.15
+pydantic>=2.8.0
+
+# DOM / scraping / browser
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+playwright>=1.48.0
+selenium>=4.22.0
+
+# Model export / quantization
+onnx>=1.16.0
+onnxruntime>=1.18.0
+# optional: gguf / llama-cpp-python if using GGUF engine
+llama-cpp-python>=0.2.0
+
+# Security / testing
+pytest>=8.3.0
+# optional: for network-level canary testing
+requests>=2.32.0
