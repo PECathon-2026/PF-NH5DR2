@@ -130,8 +130,9 @@ def main():
         num_labels=NUM_LABELS,
         id2label=ID2LABEL,
         label2id=LABEL2ID,
-        dropout=0.3,  # Add dropout for regularization
     )
+    model.config.hidden_dropout_prob = 0.3
+    model.config.attention_probs_dropout_prob = 0.3
 
     print("Loading corpus...")
     texts, labels = load_corpus("data/corpus/train.jsonl")

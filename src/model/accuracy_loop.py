@@ -41,6 +41,13 @@ def evaluate_model(model_path, corpus_path, sample_size=500):
     
     from transformers import AutoTokenizer, AutoModelForTokenClassification
     
+    LABEL2ID = {
+        'O': 0, 'B-CARD': 1, 'I-CARD': 2, 'B-PHONE': 3, 'I-PHONE': 4,
+        'B-PAN': 5, 'I-PAN': 6, 'B-EMAIL': 7, 'I-EMAIL': 8,
+        'B-IP': 9, 'I-IP': 10, 'B-URL': 11, 'I-URL': 12,
+        'B-OTP': 13, 'I-OTP': 14, 'B-PERSON': 15, 'I-PERSON': 16,
+    }
+    
     tokenizer = AutoTokenizer.from_pretrained('models/google-bert_bert-base-uncased')
     model = AutoModelForTokenClassification.from_pretrained(model_path)
     
