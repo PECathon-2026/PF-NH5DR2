@@ -26,8 +26,8 @@ selenium>=4.22.0
 # Model export / quantization
 onnx>=1.16.0
 onnxruntime>=1.18.0
-# optional: gguf / llama-cpp-python if using GGUF engine
-llama-cpp-python>=0.2.0
+# Optional GGUF runtime is listed in requirements-gguf.txt. It requires a
+# compatible Python wheel or a local C/C++ build toolchain on Windows.
 
 # Security / testing
 pytest>=8.3.0

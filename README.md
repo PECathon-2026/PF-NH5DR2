@@ -63,6 +63,18 @@ F:/Hackthon
 python -m venv .venv && .\.venv\Scripts\activate
 pip install -r requirements.txt
 
+The default configuration uses the Transformers engine, so the GGUF runtime is
+optional. If you switch `config.yaml` to a GGUF engine, install it separately:
+
+```powershell
+python -m pip install -r requirements-gguf.txt
+```
+
+On Windows with Python 3.13, `llama-cpp-python` may not have a compatible
+prebuilt wheel and pip will fall back to compiling it. Use Python 3.11 or 3.12
+for a prebuilt wheel when available, or install the Visual C++ build tools and
+CMake before running the optional install.
+
 # 2. generate synthetic corpus (Person B)
 python src/model/corpus/build_corpus.py --out F:/Hackthon/data/corpus
 

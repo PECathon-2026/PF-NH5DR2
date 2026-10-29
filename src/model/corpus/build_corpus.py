@@ -1,67 +1,67 @@
-"""Compile the training corpus for the local PII classifier.
+# src/model/corpus/build_corpus.py
+import json, random, re
+from faker import Faker
 
-Builds a combined corpus from:
-  - dlptest sample rows (download to data/dlptest/)
-  - Faker-generated phone / OTP / card / email / name PII text
-
-Output: data/corpus/train.jsonl  (IOB2 label format)
-         data/corpus/test.jsonl   (held-out eval)
-
-Label types (IOB2):
-  CARD, PHONE, PAN, EMAIL, IP, URL, OTP, PERSON, ENTITY
-"""
-from __future__ import annotations
-
-import argparse
-import json
-import logging
-import random
-from pathlib import Path
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-logger = logging.getLogger(__name__)
-
+fake = Faker('en_US')
+random.seed(42)
 
 LABEL_TYPES = ["CARD", "PHONE", "PAN", "EMAIL", "IP", "URL", "OTP", "PERSON", "ENTITY"]
 
+def generate_phone():
+    return f"{random.randint(1000000000,9999999999)}"
 
-def iob2(tags: list[str]) -> bool:
-    """Check IOB2 compliance."""
-    for i, t in enumerate(tags):
-        if t.startswith("B-"):
-            continue
-        if t == "O":
-            continue
-        if t.startswith("I-") and i == 0:
-            return False
-        if t.startswith("I-") and i > 0 and not tags[i - 1].startswith("I-") and tags[i - 1] != "O":
-            return False
-    return True
+def generate_otp():
+    return f"{random.randint(100000,999999)}"
 
+def generate_card():
+    # Luhn-valid test card
+    return "4532015112830366"
 
-def build_corpus(out_dir: str, size: int = 400) -> Path:
-    """Compile the training corpus (placeholder)."""
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    train = out / "train.jsonl"
-    test = out / "test.jsonl"
-    # TODO(Person B): fill with dlptest rows + Faker generation
-    for i in range(size):
-        record = {"text": f"synthetic line {i}", "labels": ["O"] * 5}
-        train.write_text(json.dumps(record) + "\n")
-        if i % 10 == 0:
-            test.write_text(json.dumps(record) + "\n")
-    logger.info("Wrote %s (%d rows)", train, size)
-    return train
+def generate_email():
+    return f"{fake.user_name()}@example.com"
 
+def generate_pan():
+    return f"{random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}{''.join(random.choices('1234567890', k=10))}"
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="F:/Hackthon/data/corpus")
-    ap.add_argument("--size", type=int, default=400)
-    args = ap.parse_args()
-    build_corpus(args.out, args.size)
+def generate_ip():
+    octets = [str(random.randint(1, 255)) for _ in range(4)]
+    return ".".join(octets)
 
+def generate_url():
+    return f"https://example.com/path/{random.randint(1000,9999)}"
 
-if __name__ == "__main__":
-    main()
+def generate_person():
+    return f"{fake.first_name()} {fake.last_name()}"
+
+def label_entities(text):
+    """Simple labeler - expand later with model"""
+    labels = ["O"] * len(text)
+    # Replace card
+    card = generate_card()
+    if card in text:
+        start = text.index(card)
+        for i in range(len(card)):
+            labels[start+i] = "B-CARD" if i==0 else "I-CARD"
+    return labels
+
+def build_record(text, labels):
+    return {"text": text, "labels": labels}
+
+# Build a small corpus
+corpus = []
+seed_texts = [
+    f"My card number is {generate_card()} and my phone is {generate_phone()}",
+    f"OTP for login is {generate_otp()} sent to {generate_phone()}",
+    f"Hello {generate_person()}, contact me at {generate_email()}",
+    f"IBAN: {generate_pan()}, IP: {generate_ip()}, URL: {generate_url()}",
+    f"Device sent {generate_card()} and {generate_phone()} to server",
+]
+for t in seed_texts:
+    corpus.append(build_record(t, label_entities(t)))
+
+import os
+os.makedirs("data/corpus", exist_ok=True)
+with open("data/corpus/train.jsonl", "w") as f:
+    for rec in corpus:
+        f.write(json.dumps(rec) + "\n")
+print(f"Wrote {len(corpus)} records to data/corpus/train.jsonl")
