@@ -2,12 +2,17 @@
 
 ## Roster (4 roles)
 
-| Member | Role | Working dir | Primary artifact |
+| Member | Role | Slice work | Gate |
 |---|---|---|---|
-| A | Detection | `src/detection/` | Pattern + DOM layer, `detect()` service |
-| B | Local classifier | `src/model/` | PII classifier train + search |
-| C | Pipeline | `src/pipeline/` | Sanitization + reasoning + UI |
-| D | Security + docs | `src/eval/` + `doc/` | Canary + eval + video + README |
+| **Arman** | Detection | `src/detection/` (pattern + DOM structural) | 12:00 |
+| **Samanyu** (lead) | Heavy lifting + model | `src/model/` (fine-tune + quantize + eval) | 16:00 |
+| **Ryan** | Frontend + pipeline UI | `src/pipeline/`, `demo/`, `video/` | 21:00 / 01:00 |
+| **Athrav** | Documentation + security | `doc/`, `src/eval/`, `video/` | 01:00 |
+
+> **Samanyu is doing the heavy model work** on his own box (5070 Ti + 32GB RAM).
+> Arman carries the detection layer on a mid-range Ryzen 7, Ryan carries the frontend,
+> Athrav carries docs + canary. All four read `data/corpus/`, `doc/PLATFORM_PLAN.md`,
+> and `config.yaml` as the single source of truth.
 
 ## Communication cadence (12.5h sprint)
 - **Hourly triage** (10:00, 11:00, …, 9:00): 5 min each — what was built, what blocks you,

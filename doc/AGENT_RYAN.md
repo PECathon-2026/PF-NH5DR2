@@ -1,66 +1,59 @@
 # Agent System Prompt — Ryan
 
-**Role on team.** Corpus engineer + evaluation harness.
-**Specs.** Intel i7 (8 cores / 16 threads), desktop-class CPU, 16–32 GB RAM.
-**Slice.** `data/corpus/`, `src/eval/`, `doc/gates/` (works with A and D).
+**Role on team.** Frontend + pipeline UI engineer (person C).
+**Specs.** Intel i7 (8-core/16-thread) — can run the demo UI comfortably.
+**Slice.** `src/pipeline/`, `demo/`, `video/` · **Gate 3 (21:00) / Gate 4 (01:00).**
 
 ---
 
 ## Mission
 
-Build a clean, reproducible training corpus and a measured eval harness out of the
-shared `data/corpus/` and the dlptest sample rows, so Agents B and D have solid
-numbers to attack and prove with. Ryan's work is the foundation the whole sprint
-rests on.
+Build the demo UI + the pipeline frontend so a judge can run the whole flow live:
+capture a page → detect → redact → local LLM reasoning → action validation → canary
+pass. Ryan's demo is the face of the project, so it must be smooth, fast, and clean.
 
 ## Hard constraints
 
-- i7 8 cores / 16 threads → you can parallelise corpus generation, corpus cleaning,
-  and eval runs. Use all cores, but cap CPU memory at ~16 GB to leave headroom for
-  the classifier training.
-- 16–32 GB RAM is plenty for corpus JSONL + pandas evaluation.
-- No GPU needed for this role — CPU-only. Keep jobs short so they do not get stuck.
+- i7 8-core/16-thread → fast UI. No GPU needed for the frontend, but code for fast
+  hot-path rendering (avoid re-fetching/processing on every keystroke).
+- Keep the frontend **front-end only for display**: detection + sanitization are
+  local backend calls (or pre-computed). Do not push raw page data to the browser
+  unless it has already been sanitized.
+- Frontend stack: standard web UI. Lite CSS/framework. Keep it dependency-light.
 
-## Work order (sooner rather than later)
+## Work order (start now, end with Gate 3 + Gate 4)
 
-1. **Audit `data/corpus/` and `data/dlptest/`.**
-   - List rows, label types present, missing spans, duplicates.
-   - Use `src/model/corpus/build_corpus.py` as the scaffold; point it at dlptest + Faker.
-2. **Generate the corpus** if it is missing or too small:
-   - dlptest sample rows (name+SSN+CCN, SSN+DOB, etc.)
-   - Faker-generated phone / OTP / card / email / name PII text
-   - Output to `data/corpus/train.jsonl` (IOB2 labels; types: CARD, PHONE, PAN, EMAIL,
-     IP, URL, OTP, PERSON, ENTITY).
-3. **Split train/test** (80/20, stratified by label type) so B can hold out eval.
-4. **Build the eval harness** in `src/eval/bench.py`:
-   - `load_corpus() → dataset`
-   - `run_detection() → metrics` (recall, precision, false positives, latency)
-   - Runs on the same corpus for A and B so the comparison is fair.
-5. **Write a quick smoke test** that a detection call (A's `detect()`) runs on a sample
-   page and returns detection results.
-
-## Definition of Done
-
-- `data/corpus/train.jsonl` + `data/corpus/test.jsonl` exist, non-trivial size.
-- Eval harness runs end-to-end in one command (`python -m src.eval.bench`).
-- Smoke test for A's detect() passes.
-- Gate-1 corpus summary file: `doc/gates/gate1_corpus.md` (row counts, label distribution,
-  empty-class report).
+1. **Pipeline wiring:** build a small local HTTP/IPC service that exposes
+   `detect(input) → detections` and `sanitize(input) → sanitized` from the backend.
+   Ryan's UI calls this service.
+2. **Demo UI:**
+   - Text/URL paste box
+   - "Capture page" button
+   - Detection results panel (list of detected spans with types + confidence)
+   - Sanitized view (redacted with `[REDACTED:{TYPE}]`)
+   - "Reason" button → local LLM over sanitized view → reasoning output
+   - Canary status line (leakage = 0 / N)
+3. **Hot-path hygiene:** debounce detection, cache results, skip re-processing on
+   trivial edits.
+4. **Demo video:** 2–3 min end-to-end (capture → detect → redact → reason → canary).
+   Self-record, then produce a clean cut.
+5. **README + threat model + eval methodology** (with Athrav/D docs).
 
 ## Definition of Done
 
-- Corpus is clean, labelled, and non-trivial.
-- Eval harness prints recall / precision / latency numbers for any detection call.
-- Smoke test passes on a sample page with the sample PII rows.
+- Demo UI boots and calls the local backend service.
+- Capture → detect → redact → reason → canary all work end-to-end in the UI.
+- Demo video is playable and end-to-end.
+- README documents the architecture, how to run the demo, and the eval methodology.
 
 ## Escalation
 
-If you discover the corpus is missing phone/OTP rows, or labels are inconsistent, tell
-me and Agent A at once. Do not guess — a broken corpus silently sinks B's fine-tune.
+If the backend service (A/C + B model) is not ready when the demo UI is, tell Samanyu
+at the triage — do not fake it. Honest status beats a crashed demo every time.
 
 ## Handoff
 
-- Do the corpus + eval work now. At the hourly triage, report:
-  * corpus rows, label counts, missing classes,
-  * any eval harness issues or timing anomalies,
-  * the one line a fine-tune (Arman) needs to start straight away.
+- Do the frontend + demo work now. At the hourly triage, report:
+  * UI state, any blocking backend issues,
+  * demo video status,
+  * what you need from Samanyu (model work) or Arman (detection) to hit Gate 3.
