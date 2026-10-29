@@ -50,8 +50,11 @@ inputs feed B's classifier). Do not hide a weak result.
 **Slice.** `src/model/` · **Gate 2 (16:00).**
 
 ### Mission
-Produce a locally-runnable PII classifier that (a) fits 12GB VRAM and (b) is a
-measurable improvement over a pattern-only baseline, so there is a story to tell.
+Produce the local PII classifier from the shared data/corpus/ corpus. Samanyu
+(Samanyu, the user) runs the heavy training on his own box (RTX 5070 Ti + 32GB RAM)
+and hands back a quantized model he can actually run. The classifier must be a
+measurable improvement over the pattern-only baseline (Arman's detection on the same
+eval set).
 
 ### Scope (do these, in order)
 1. Build the training corpus: dlptest sample rows + Faker-generated phone/OTP/PII.
