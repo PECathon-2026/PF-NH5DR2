@@ -1,8 +1,7 @@
 # src/model/train.py
-import os
 import json
-import torch
-from torch.utils.data import Dataset, DataLoader
+import random
+import numpy as np
 from transformers import AutoTokenizer, AutoModelForTokenClassification, Trainer, TrainingArguments
 from datasets import Dataset
 
@@ -17,7 +16,6 @@ LABEL2ID = {
     "B-URL": 11, "I-URL": 12,
     "B-OTP": 13, "I-OTP": 14,
     "B-PERSON": 15, "I-PERSON": 16,
-    "B-ENTITY": 17, "I-ENTITY": 18,
 }
 ID2LABEL = {v: k for k, v in LABEL2ID.items()}
 NUM_LABELS = len(LABEL2ID)
@@ -28,44 +26,18 @@ def load_corpus(path):
         for line in f:
             rec = json.loads(line)
             texts.append(rec["text"])
-            # Convert string labels to integer IDs
             labels.append([LABEL2ID[l] for l in rec["labels"]])
     return texts, labels
 
-def tokenize(inputs, tokenizer, max_length=128):
-    return tokenizer(
-        inputs["text"],
-        padding="max_length",
-        truncation=True,
-        max_length=max_length,
-        is_split_into_words=False,
-    )
-
-class PIIDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer, max_length=128):
-        self.encodings = tokenizer(texts, truncation=True, padding=True, max_length=max_length)
-        self.labels = labels
-        self.encodings = self.encodings
-
-    def __len__(self):
-        return len(self.encodings["input_ids"])
-
-    def __getitem__(self, i):
-        item = {k: torch.tensor(v[i]) for k, v in self.encodings.items()}
-        item["labels"] = torch.tensor(self.labels[i])
-        return item
-
-def compute_metrics(pred):
-    labels = pred.label_ids
-    preds = pred.predictions.argmax(-1)
-    # Simplified: return accuracy (expand for full seq-tag metrics)
-    correct = (preds == labels).sum()
-    total = len(labels)
-    return {"accuracy": correct / total}
-
 def tokenize_and_align_labels(texts, labels, tokenizer, max_length=128):
     """Tokenize text and align character-level B-/I- labels to subword tokens."""
-    tokenized = tokenizer(texts, truncation=True, padding="max_length", max_length=max_length, return_offsets_mapping=True)
+    tokenized = tokenizer(
+        texts,
+        truncation=True,
+        padding="max_length",
+        max_length=max_length,
+        return_offsets_mapping=True,
+    )
     
     aligned_labels = []
     for i, label in enumerate(labels):
@@ -75,7 +47,6 @@ def tokenize_and_align_labels(texts, labels, tokenizer, max_length=128):
             if start == 0 and end == 0:
                 label_ids.append(-100)
             else:
-                # Use label from first character of this token
                 char_label = label[start]
                 if isinstance(char_label, str):
                     char_label = LABEL2ID[char_label]
@@ -85,6 +56,56 @@ def tokenize_and_align_labels(texts, labels, tokenizer, max_length=128):
     tokenized.pop("offset_mapping")
     tokenized["labels"] = aligned_labels
     return tokenized
+
+def extract_entities(preds, labels, is_pred=False):
+    """Extract entity spans from BIO tags."""
+    entities = set()
+    current_entity = None
+    
+    for i, (p, l) in enumerate(zip(preds, labels)):
+        tag = ID2LABEL[p] if is_pred else ID2LABEL[l]
+        
+        if tag.startswith("B-"):
+            if current_entity:
+                entities.add(current_entity)
+            current_entity = (tag[2:], i, i+1)
+        elif tag.startswith("I-") and current_entity and current_entity[0] == tag[2:]:
+            current_entity = (current_entity[0], current_entity[1], i+1)
+        else:
+            if current_entity:
+                entities.add(current_entity)
+                current_entity = None
+    
+    if current_entity:
+        entities.add(current_entity)
+    
+    return entities
+
+def compute_metrics(eval_pred):
+    """Compute token-level accuracy and entity-level F1, ignoring masked positions."""
+    logits, labels = eval_pred
+    preds = np.argmax(logits, axis=-1)
+    
+    # Mask out padding/special tokens (-100)
+    mask = labels != -100
+    correct = (preds[mask] == labels[mask]).sum()
+    total = mask.sum()
+    token_accuracy = float(correct / total) if total > 0 else 0.0
+    
+    # Entity-level precision/recall/F1
+    true_entities = extract_entities(preds[mask], labels[mask])
+    pred_entities = extract_entities(preds[mask], labels[mask], is_pred=True)
+    
+    precision = len(true_entities & pred_entities) / max(1, len(pred_entities))
+    recall = len(true_entities & pred_entities) / max(1, len(true_entities))
+    f1 = 2 * precision * recall / max(1e-9, precision + recall)
+    
+    return {
+        "accuracy": token_accuracy,
+        "entity_precision": precision,
+        "entity_recall": recall,
+        "entity_f1": f1,
+    }
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained("models/google-bert_bert-base-uncased")
@@ -97,10 +118,17 @@ def main():
 
     texts, labels = load_corpus("data/corpus/train.jsonl")
     
-    # Split into train/val (90/10)
-    split = int(0.9 * len(texts))
-    train_texts, val_texts = texts[:split], texts[split:]
-    train_labels, val_labels = labels[:split], labels[split:]
+    # Random split with fixed seed
+    random.seed(42)
+    indices = list(range(len(texts)))
+    random.shuffle(indices)
+    split = int(0.9 * len(indices))
+    train_idx, val_idx = indices[:split], indices[split:]
+    
+    train_texts = [texts[i] for i in train_idx]
+    train_labels = [labels[i] for i in train_idx]
+    val_texts = [texts[i] for i in val_idx]
+    val_labels = [labels[i] for i in val_idx]
     
     # Build datasets
     train_encodings = tokenize_and_align_labels(train_texts, train_labels, tokenizer)
@@ -118,7 +146,6 @@ def main():
         save_steps=500,
         eval_strategy="steps",
         eval_steps=250,
-        max_steps=2000,
         report_to="none",
     )
 
