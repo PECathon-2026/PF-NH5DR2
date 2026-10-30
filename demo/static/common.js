@@ -121,21 +121,29 @@ function sparks(n = 14) {
 
 // The lens: raw text underneath, the sanitized view revealed inside a moving
 // circle. Redaction bars are the same width as the text they hide.
+// The card scrolls for long text (PDF pages); the lens lives in content
+// coordinates, so it stays on the same words while you scroll.
 function lens(stage) {
-  stage.innerHTML = '<div class="layer raw"></div><div class="layer safe" aria-hidden="true"></div><div class="ring" aria-hidden="true"></div><div class="fade" aria-hidden="true"></div>';
-  const raw = stage.querySelector(".raw"), safe = stage.querySelector(".safe");
-  const at = (x, y) => { stage.style.setProperty("--x", `${x}px`); stage.style.setProperty("--y", `${y}px`); stage.style.setProperty("--r", "90px"); };
-  // Idle: orbit over the text itself (not the empty part of the card).
+  stage.innerHTML = '<div class="lens-content"><div class="layer raw"></div><div class="layer safe" aria-hidden="true"></div><div class="ring" aria-hidden="true"></div></div><div class="scroll-hint" aria-hidden="true" hidden>Scroll for more ↓</div>';
+  const content = stage.querySelector(".lens-content"), raw = stage.querySelector(".raw"), safe = stage.querySelector(".safe");
+  const hint = stage.querySelector(".scroll-hint");
+  const at = (x, y) => { content.style.setProperty("--x", `${x}px`); content.style.setProperty("--y", `${y}px`); content.style.setProperty("--r", "90px"); };
+  // Idle: orbit over the text that's currently in view.
   let t = 0, auto = setInterval(() => {
     t += 0.03;
-    const h = Math.min(stage.clientHeight, raw.scrollHeight), w = stage.clientWidth;
-    at(w / 2 + Math.cos(t) * Math.min(190, w / 3), h / 2 + Math.sin(t * 1.3) * Math.max(8, Math.min(80, h / 2 - 40)));
+    const view = stage.clientHeight, h = Math.min(view, raw.offsetHeight - stage.scrollTop), w = stage.clientWidth;
+    at(w / 2 + Math.cos(t) * Math.min(190, w / 3), stage.scrollTop + h / 2 + Math.sin(t * 1.3) * Math.max(8, Math.min(80, h / 2 - 40)));
   }, 30);
   const stop = () => { clearInterval(auto); auto = null; };
-  const move = (e) => { const r = stage.getBoundingClientRect(); at(e.clientX - r.left, e.clientY - r.top); };
+  let last = null; // last pointer position (viewport coords), to re-aim after a scroll
+  const aim = () => { if (!last) return; const r = stage.getBoundingClientRect(); at(last.x - r.left + stage.scrollLeft, last.y - r.top + stage.scrollTop); };
+  const move = (e) => { last = { x: e.clientX, y: e.clientY }; aim(); };
+  const updateHint = () => { hint.hidden = stage.scrollHeight - stage.clientHeight - stage.scrollTop < 8; };
   stage.addEventListener("pointerenter", stop);
   stage.addEventListener("pointermove", move);
   stage.addEventListener("pointerdown", (e) => { stop(); move(e); });
+  stage.addEventListener("pointerleave", () => { last = null; });
+  stage.addEventListener("scroll", () => { aim(); updateHint(); }, { passive: true });
   return {
     show(text, dets) {
       let html = "", cur = 0;
@@ -146,7 +154,10 @@ function lens(stage) {
       html += esc(text.slice(cur));
       raw.innerHTML = text ? html : '<span class="empty">Type something below to inspect it…</span>';
       safe.innerHTML = text ? html : "";
+      requestAnimationFrame(updateHint);
     },
+    // Back to the top when new content (e.g. another PDF page) is shown.
+    reset() { stage.scrollTop = 0; requestAnimationFrame(updateHint); },
   };
 }
 

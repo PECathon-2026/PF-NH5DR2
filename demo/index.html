@@ -135,6 +135,7 @@ function showPage(i) {
   $("prev").disabled = page === 0;
   $("next2").disabled = page === doc.pages.length - 1;
   render(p);
+  lensView.reset();
 }
 
 function enterDoc(d) {
@@ -154,6 +155,7 @@ function leaveDoc() {
   input.readOnly = false;
   $("docbar").hidden = true;
   input.value = lastInput.get() || SAMPLES["Checkout form"];
+  lensView.reset();
   run(true);
 }
 

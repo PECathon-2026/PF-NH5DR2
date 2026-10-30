@@ -137,8 +137,18 @@ nav.tabs a[aria-current="page"] span { color: var(--red); }
 .hint { display: inline-flex; gap: 8px; align-items: center; margin-top: 16px; padding: 8px 14px; border-radius: 99px;
   background: var(--red-soft); border: 1px solid rgba(var(--hl-rgb),.4); color: var(--red-ink); font-size: 13px; }
 .stage { position: relative; border-radius: 22px; background: var(--panel-solid); border: 1px solid var(--line-strong);
-  min-height: 300px; max-height: 420px; cursor: none; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,.45); touch-action: none; }
-.stage .layer { position: absolute; inset: 0; padding: 26px; font: 16px/2 var(--mono); white-space: pre-wrap; word-break: break-word; }
+  min-height: 300px; max-height: 420px; cursor: none; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: 0 30px 60px rgba(0,0,0,.45); touch-action: pan-y; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.stage::-webkit-scrollbar { width: 8px; }
+.stage::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+/* Scrolling content box: raw text is in flow (sets the height); the safe layer
+   and ring sit on top of it in the same coordinates. */
+.stage .lens-content { position: relative; min-height: 100%; overflow: hidden; }
+.stage .layer { padding: 26px; font: 16px/2 var(--mono); white-space: pre-wrap; word-break: break-word; }
+.stage .raw { position: relative; }
+.stage .safe { position: absolute; inset: 0; }
+.stage .scroll-hint { position: sticky; bottom: 10px; width: fit-content; margin: -36px 16px 10px auto; padding: 4px 10px; border-radius: 99px;
+  font: 600 11px var(--sans); color: var(--label); background: var(--field); border: 1px solid var(--line-strong); pointer-events: none; }
 .stage .raw .s { color: var(--raw); background: var(--raw-soft); border-radius: 4px; }
 .stage .safe { clip-path: circle(var(--r, 0px) at var(--x, 50%) var(--y, 50%)); background: var(--panel-solid); }
 .stage .safe .s { background: var(--red); color: transparent; border-radius: 5px; position: relative; }
@@ -147,8 +157,6 @@ nav.tabs a[aria-current="page"] span { color: var(--red); }
 .stage .ring { position: absolute; width: 180px; height: 180px; border-radius: 50%; border: 3px solid var(--red);
   box-shadow: 0 0 30px rgba(var(--hl-rgb),.65), inset 0 0 30px rgba(var(--hl-rgb),.27); left: var(--x, 50%); top: var(--y, 50%);
   transform: translate(-50%, -50%); pointer-events: none; }
-.stage .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: linear-gradient(transparent, var(--panel-solid)); pointer-events: none; }
-
 /* stat tiles */
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
 .stat { border-radius: 16px; padding: 16px 18px; background: var(--tile); border: 1px solid var(--line); }
