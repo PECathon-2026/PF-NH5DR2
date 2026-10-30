@@ -56,7 +56,7 @@ const ARCH = [
   ["live", "Merge", "Pattern and model spans are combined; on overlap the higher-priority detector wins."],
   ["live", "Sanitizer", "Each span is replaced with [REDACTED:TYPE], keeping the text's structure."],
   ["live", "Leak check", "The output is re-scanned for every detected value. Any hit blocks the response (fail-closed)."],
-  ["todo", "Local LLM reasoning", "Planned: an on-device model reasons over the sanitized view only."],
+  ["live", "Private RAG", "PDFs and messages are redacted before indexing; questions are redacted before search; a local LLM answers from sanitized text only."],
   ["todo", "DOM structural layer", "Planned: use form-field types and labels (e.g. input[type=tel]) as extra signals."],
 ];
 

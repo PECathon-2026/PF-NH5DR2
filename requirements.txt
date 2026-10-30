@@ -37,3 +37,8 @@ requests>=2.32.0
 # Demo server
 fastapi>=0.110.0
 uvicorn>=0.29.0
+
+# Documents + private RAG
+pypdf>=4.0.0
+python-multipart>=0.0.9
+reportlab>=4.0.0  # only to regenerate demo/samples PDFs

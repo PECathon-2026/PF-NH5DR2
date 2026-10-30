@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 import logging
+import re
 import sys
 import time
 from dataclasses import asdict, dataclass, field
@@ -74,8 +75,76 @@ def count_leaks(sanitized: str, detections: List[DetectionResult]) -> int:
     return sum(1 for d in detections if d.text and d.text in sanitized)
 
 
+# The NER model reads ~128 tokens at a time, so long text is sanitized in
+# segments cut at line / sentence boundaries and stitched back together.
+SEGMENT_CHARS = 360
+_BREAK = re.compile(r"\n|(?<=[.!?;])\s+")
+
+
+def segments(text: str, limit: int = SEGMENT_CHARS) -> List[tuple]:
+    """Split *text* into (start, end) spans of at most ~limit chars, cut at breaks."""
+    spans, start = [], 0
+    while len(text) - start > limit:
+        window = text[start:start + limit]
+        cuts = [m.end() for m in _BREAK.finditer(window) if m.end() > limit // 3]
+        if cuts:
+            end = start + cuts[-1]
+        else:  # no break: cut at the last space so a value isn't split mid-word
+            sp = window.rfind(" ")
+            end = start + (sp + 1 if sp > limit // 3 else limit)
+        spans.append((start, end))
+        start = end
+    if start < len(text) or not spans:
+        spans.append((start, len(text)))
+    return spans
+
+
+def _merge_traces(traces: List[dict], text: str, sanitized: str, n_dets: int, leaked: int) -> dict:
+    base = {"detectors": [dict(d) for d in traces[0]["detectors"]], "merge": dict(traces[0]["merge"]),
+            "model": dict(traces[0]["model"]), "sanitize": dict(traces[0]["sanitize"]),
+            "leak_check": dict(traces[0]["leak_check"])}
+    for tr in traces[1:]:
+        for agg, d in zip(base["detectors"], tr["detectors"]):
+            for k in ("matches", "rejected", "ms"):
+                agg[k] += d[k]
+        for k in ("candidates", "pattern", "model", "dropped_overlap", "kept", "ms"):
+            base["merge"][k] += tr["merge"][k]
+        base["model"]["matches"] += tr["model"]["matches"]
+        base["model"]["ms"] += tr["model"]["ms"]
+        base["sanitize"]["ms"] += tr["sanitize"]["ms"]
+        base["leak_check"]["ms"] += tr["leak_check"]["ms"]
+    base["input"] = {"chars": len(text), "lines": text.count("\n") + 1 if text else 0, "segments": len(traces)}
+    base["sanitize"].update(replaced=n_dets, chars_out=len(sanitized))
+    base["leak_check"].update(checked=n_dets, leaked=leaked)
+    return base
+
+
 def sanitize(text: str, typed: bool = True) -> SanitizeResult:
-    """Detect and redact sensitive spans in *text*. Fail-closed on any error."""
+    """Detect and redact sensitive spans in *text*. Fail-closed on any error.
+
+    Long text is processed segment by segment (see segments()); offsets in the
+    returned detections always refer to the full *text*.
+    """
+    spans = segments(text)
+    if len(spans) == 1:
+        return _sanitize_one(text, typed)
+    t0 = time.perf_counter()
+    parts, dets, traces = [], [], []
+    for s, e in spans:
+        r = _sanitize_one(text[s:e], typed)
+        parts.append(r.sanitized)
+        traces.append(r.trace)
+        dets.extend(DetectionResult(d.text, d.label, d.start + s, d.end + s, d.confidence, d.source)
+                    for d in r.detections)
+    sanitized = "".join(parts)
+    leaked = count_leaks(sanitized, dets)  # re-check the stitched document as a whole
+    if leaked:
+        raise SanitizationError(f"{leaked} detected value(s) survived sanitization")
+    return SanitizeResult(text, sanitized, dets, leaked, (time.perf_counter() - t0) * 1000,
+                          _merge_traces(traces, text, sanitized, len(dets), leaked))
+
+
+def _sanitize_one(text: str, typed: bool = True) -> SanitizeResult:
     t0 = time.perf_counter()
     try:
         t = time.perf_counter()

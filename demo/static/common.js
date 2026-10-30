@@ -18,6 +18,7 @@ const SAMPLES = {
 
 const PAGES = [
   ["/", "Live demo"],
+  ["/ask", "Ask documents"],
   ["/pipeline", "Pipeline"],
   ["/training", "Model training"],
   ["/evaluation", "Evaluation"],
@@ -147,6 +148,41 @@ function lens(stage) {
       safe.innerHTML = text ? html : "";
     },
   };
+}
+
+// ---- PDFs -----------------------------------------------------------------
+const SAMPLE_PDFS = { "Bank statement PDF": "bank_statement.pdf", "KYC form PDF": "kyc_form.pdf" };
+
+// POST a PDF to /api/document; the server sanitizes every page (and indexes it for RAG).
+async function uploadPdf(blob, name, index = true) {
+  const fd = new FormData();
+  fd.append("file", blob, name);
+  fd.append("index", String(index));
+  const r = await fetch("/api/document", { method: "POST", body: fd });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
+  return body;
+}
+
+async function samplePdf(file) {
+  const r = await fetch(`/samples/${file}`);
+  if (!r.ok) throw new Error("Sample not found");
+  return r.blob();
+}
+
+// Wire a hidden <input type=file> + sample buttons to one handler(blob, name).
+function pdfPickers(fileInput, samplesEl, onPdf) {
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    if (f) onPdf(f, f.name);
+    fileInput.value = "";
+  });
+  for (const [label, file] of Object.entries(SAMPLE_PDFS)) {
+    const b = document.createElement("button");
+    b.className = "sample pdf"; b.textContent = label;
+    b.onclick = async () => onPdf(await samplePdf(file), file);
+    samplesEl.appendChild(b);
+  }
 }
 
 let _pipeline = null;
