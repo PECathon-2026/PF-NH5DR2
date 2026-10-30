@@ -12,7 +12,7 @@
 
   <div class="page-head">
     <h2>How the model is trained</h2>
-    <p>The NER classifier handles what regex can't: names and values that depend on context. Every setting on this page is read from <code>src/model/train.py</code> and <code>build_corpus.py</code> when the page loads, so it always matches the code.</p>
+    <p>The NER classifier handles what regex can't: names and values that depend on context. Every setting on this page is read from the training scripts in <code>src/model/</code> and the saved training log when the page loads, so it always matches the code.</p>
   </div>
 
   <section class="section">
@@ -42,14 +42,14 @@ function renderSteps(tr) {
   const entityTypes = [...new Set(t.labels.filter((l) => l !== "O").map((l) => l.slice(2)))];
   const steps = [
     ["Synthetic corpus", "Faker fills sentence templates with fake but realistic values, so no real personal data is used for training.",
-      kv([["templates", c.templates.length], ["rounds", num(c.rounds)], ["sentences", num(c.planned_sentences)], ["on disk", c.generated_lines == null ? "not generated on this server" : `${c.generated_lines} lines`]]) +
+      kv([["script", esc(c.source)], ["templates", c.templates.length], ["rounds", c.rounds], ["sentences", num(c.planned_sentences)], ["on disk", c.generated_lines == null ? "not generated on this server" : `${c.generated_lines} lines`]]) +
       `<div class="chips" style="margin-top:8px">${c.generators.map((g) => `<span class="chip">${g}</span>`).join("")}</div>`],
     ["IOB2 labelling", "Every character gets a tag: B- marks the start of an entity, I- its continuation, O everything else.",
       `<div class="chips">${t.labels.map((l) => `<span class="chip${l === "O" ? "" : " b"}">${l}</span>`).join("")}</div>`],
     ["Tokenize + align", "Text is split into WordPiece subwords and each subword takes the tag of its first character. Padding and special tokens are masked with -100.",
       kv([["tokenizer", esc(t.base_model || "?")], ["max_length", num(t.max_length)], ["types", entityTypes.length]])],
     ["Fine-tune BERT", "A token-classification head is trained on top of the pre-trained encoder.",
-      kv([["base", esc(t.base_model || "?")], ["epochs", num(a.num_train_epochs)], ["learning rate", num(a.learning_rate)], ["batch", num(a.per_device_train_batch_size)], ["split", t.train_split ? `${Math.round(t.train_split * 100)}/${Math.round((1 - t.train_split) * 100)} (seed ${t.seed})` : null], ["eval every", a.eval_steps ? `${a.eval_steps} steps` : null]])],
+      kv([["script", esc(t.source)], ["base", esc(t.base_model || "?")], ["epochs", a.num_train_epochs], ["max steps", a.max_steps], ["learning rate", num(a.learning_rate)], ["weight decay", a.weight_decay], ["batch", num(a.per_device_train_batch_size)], ["subset", t.subset ? `${t.subset} sentences` : null], ["split", t.train_split ? `${Math.round(t.train_split * 100)}/${Math.round((1 - t.train_split) * 100)} (seed ${t.seed})` : null], ["best model by", a.metric_for_best_model]])],
     ["Evaluate", "compute_metrics reports token accuracy plus entity-level precision, recall and F1 on the held-out split.",
       kv([["metrics", "accuracy, entity P / R / F1"], ["saved to", esc(a.output_dir || "models/pii_classifier")]])],
     ["Serve on-device", "The detection layer loads the model lazily and merges its spans with the pattern layer. Patterns win on overlap, and model spans scoring under 0.6 are ignored.",
@@ -62,12 +62,13 @@ const SAMPLE_VALUES = { card: "4532015112830366", phone: "9876543210", otp: "482
   pan: "ABCDE1234F", ip: "203.0.113.42", url: "https://example.com/path/4821", person: "Priya Sharma" };
 
 function renderIob(c) {
-  const tpl = c.templates.find((x) => x.includes("{{person}}")) || c.templates[0];
+  const tpl = c.templates.find((x) => /\{\{?person\}/.test(x) && /\{\{?email\}/.test(x))
+    || c.templates.find((x) => /\{\{?person\}/.test(x)) || c.templates[0];
   if (!tpl) { $("iobCard").innerHTML = '<span class="empty">No templates found in build_corpus.py.</span>'; return; }
   const spans = [];
   let text = "";
-  tpl.split(/(\{\{\w+\}\})/).forEach((part) => {
-    const m = part.match(/^\{\{(\w+)\}\}$/);
+  tpl.split(/(\{\{?\w+\}\}?)/).forEach((part) => {
+    const m = part.match(/^\{\{?(\w+)\}\}?$/);
     if (m && SAMPLE_VALUES[m[1]]) { spans.push([text.length, text.length + SAMPLE_VALUES[m[1]].length, m[1].toUpperCase()]); text += SAMPLE_VALUES[m[1]]; }
     else text += part;
   });
@@ -111,9 +112,12 @@ python src/model/train.py</pre>
     return;
   }
   const f = run.final_eval || {};
-  $("runCard").innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">${run.global_step} steps, ${Number(run.epochs || 0).toFixed(1)} epochs</h3>
+  const last = run.train_loss.length ? run.train_loss[run.train_loss.length - 1].loss : null;
+  $("runCard").innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">${run.global_step} steps, ${Number(run.epochs || 0).toFixed(2)} epochs</h3>
     <div class="two" style="margin-top:0"><div>${lossChart(run)}</div>
-    <div>${kv([["entity F1", f.eval_entity_f1 != null ? pct(f.eval_entity_f1) : null], ["entity precision", f.eval_entity_precision != null ? pct(f.eval_entity_precision) : null], ["entity recall", f.eval_entity_recall != null ? pct(f.eval_entity_recall) : null], ["token accuracy", f.eval_accuracy != null ? pct(f.eval_accuracy) : null], ["source", esc(run.source)]])}</div></div>`;
+    <div>${kv([["final train loss", last != null ? last.toFixed(4) : null], ["validation loss", f.eval_loss != null ? f.eval_loss.toFixed(4) : null], ["entity F1", f.eval_entity_f1 != null ? pct(f.eval_entity_f1) : null], ["entity precision", f.eval_entity_precision != null ? pct(f.eval_entity_precision) : null], ["entity recall", f.eval_entity_recall != null ? pct(f.eval_entity_recall) : null], ["token accuracy", f.eval_accuracy != null ? pct(f.eval_accuracy) : null], ["source", esc(run.source)]])}
+    ${run.dropped_invalid && run.dropped_invalid.length ? `<p class="miss" style="margin:10px 0 0">Not shown: ${run.dropped_invalid.map(esc).join(", ")} in the training log isn't a valid ratio (bug in that run's metric code). See the Evaluation page for accuracy measured on the served model.</p>` : ""}
+    <p class="miss" style="margin:8px 0 0">Model status: <b>${esc(tr.ner.state)}</b>${tr.ner.load_ms ? `, loaded in ${(tr.ner.load_ms / 1000).toFixed(1)} s` : ""}</p></div></div>`;
 }
 
 getPipeline().then((p) => {

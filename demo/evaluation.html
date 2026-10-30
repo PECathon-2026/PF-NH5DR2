@@ -18,6 +18,12 @@
   <section class="stats" id="kpis"></section>
 
   <section class="section">
+    <h2>Patterns vs model vs both</h2>
+    <p class="sub" id="cmpSub">Same test sentences scored three ways, including names, which only the model can find.</p>
+    <div class="card tablewrap" id="cmpCard"><span class="empty">Loading…</span></div>
+  </section>
+
+  <section class="section">
     <h2>Pattern layer accuracy</h2>
     <p class="sub" id="evalSub">Loading…</p>
     <div class="card tablewrap" id="evalCard"></div>
@@ -39,11 +45,13 @@ function bar(v) {
   return `<span class="bar${v < 0.9 ? " low" : ""}"><span class="t"><i style="width:${(v * 100).toFixed(1)}%"></i></span>${pct(v)}</span>`;
 }
 
-function renderKpis(ev, ca) {
-  const o = ev.overall, n = ev.negatives;
+function renderKpis(ev, ca, me) {
+  const both = me && me.available ? me.configs.ensemble : null;
+  const o = both ? both.overall : ev.overall, n = both ? both.negatives : ev.negatives;
+  const who = both ? "patterns + model" : "pattern layer";
   const tiles = [
-    [pct(o.precision), "precision, all types"],
-    [pct(o.recall), "recall, all types"],
+    [pct(o.precision), `precision, ${who}`],
+    [pct(o.recall), `recall, ${who}`],
     [`${n.flagged}/${n.total}`, "false alarms on clean text", n.flagged > 0],
     [`${ca.leaked}/${ca.markers}`, "canary values leaked", ca.leaked > 0],
   ];
@@ -71,9 +79,45 @@ function renderCanary(ca) {
     </tbody></table>`;
 }
 
-getPipeline().then((p) => {
-  renderKpis(p.evaluation, p.canary); renderEval(p.evaluation); renderCanary(p.canary);
-}).catch(() => { $("evalSub").innerHTML = '<span class="err">Could not load evaluation results from the backend.</span>'; });
+const CONFIGS = [["pattern", "Patterns only"], ["model", "Model only"], ["ensemble", "Patterns + model"]];
+
+function renderCompare(me) {
+  if (me.available === null) {
+    $("cmpCard").innerHTML = '<span class="empty">Loading the model and running the benchmark… this takes about 30 seconds after the server starts.</span>';
+    return false;
+  }
+  if (!me.available) {
+    $("cmpCard").innerHTML = `<div class="note">The NER model isn't running on this server (${esc(me.status.state)}${me.status.detail ? `: ${esc(me.status.detail)}` : ""}), so only the pattern layer is evaluated below. Run the demo locally with the trained weights to see this comparison.</div>`;
+    return true;
+  }
+  const c = me.configs, any = c.ensemble;
+  $("cmpSub").textContent = `${me.cases} sentences (seed ${me.seed}, a different sample from the pattern benchmark below), including ${any.per_label.PERSON.tp + any.per_label.PERSON.fn} with a person's name. Exact type and span must match.`;
+  const head = CONFIGS.map(([, n]) => `<th>${n}</th>`).join("");
+  const row = (label, f, low) => `<tr><td>${label}</td>${CONFIGS.map(([k]) => `<td>${f(c[k], low)}</td>`).join("")}</tr>`;
+  const types = Object.keys(any.per_label);
+  $("cmpCard").innerHTML = `<table class="m"><thead><tr><th></th>${head}</tr></thead><tbody>
+    ${row("Precision", (r) => bar(r.overall.precision))}
+    ${row("Recall", (r) => bar(r.overall.recall))}
+    ${row("F1", (r) => pct(r.overall.f1))}
+    ${row("False alarms on clean text", (r) => `${r.negatives.flagged}/${r.negatives.total}`)}
+    ${row("Time per sentence", (r) => ms(r.ms_per_case))}
+    </tbody></table>
+    <h3 style="margin:18px 0 6px;font-size:13px">Recall by type</h3>
+    <table class="m"><thead><tr><th>Type</th>${head}</tr></thead><tbody>
+    ${types.map((t) => `<tr><td><span class="lbl">${t}</span></td>${CONFIGS.map(([k]) => `<td>${bar(c[k].per_label[t].recall)}</td>`).join("")}</tr>`).join("")}
+    </tbody></table>
+    <p class="miss" style="margin:12px 0 0">The model proposes spans and the pattern layer's validators verify them (Luhn checksum for cards, octet range for IPs, word boundaries for names, an OTP keyword nearby). These rules were tuned on a separate sample (seed 99), not on the one scored here.</p>`;
+  return true;
+}
+
+function load() {
+  _pipeline = null;
+  getPipeline().then((p) => {
+    renderKpis(p.evaluation, p.canary, p.model_evaluation); renderEval(p.evaluation); renderCanary(p.canary);
+    if (!renderCompare(p.model_evaluation)) setTimeout(load, 4000);
+  }).catch(() => { $("evalSub").innerHTML = '<span class="err">Could not load evaluation results from the backend.</span>'; });
+}
+load();
 </script>
 </body>
 </html>

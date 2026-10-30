@@ -37,6 +37,14 @@ MAX_CHARS = 20_000
 app = FastAPI(title="PrivacyLens demo", docs_url=None, redoc_url=None)
 
 
+@app.middleware("http")
+async def no_stale_pages(request, call_next):
+    # Pages and assets change on every deploy; make browsers revalidate.
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 class SanitizeRequest(BaseModel):
     text: str = Field(default="", max_length=MAX_CHARS)
     typed: bool = True
@@ -69,8 +77,14 @@ def api_pipeline() -> dict:
         "detectors": insights.detectors_info(),
         "training": insights.training_info(),
         "evaluation": insights.evaluate_patterns(),
+        "model_evaluation": insights.model_evaluation(),
         "canary": insights.canary_audit(),
     }
+
+
+@app.on_event("startup")
+def _warm_up() -> None:
+    insights.warm_up()
 
 
 @app.post("/api/sanitize")

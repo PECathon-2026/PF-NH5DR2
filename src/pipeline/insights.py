@@ -18,6 +18,7 @@ import json
 import random
 import re
 import string
+import threading
 import time
 from collections import defaultdict
 from functools import lru_cache
@@ -27,8 +28,16 @@ from src.detection import DETECTORS, detect
 from src.detection import ner
 
 ROOT = Path(__file__).resolve().parents[2]
-TRAIN_PY = ROOT / "src" / "model" / "train.py"
-CORPUS_PY = ROOT / "src" / "model" / "corpus" / "build_corpus.py"
+
+
+def _newest(*paths: Path) -> Path:
+    """First existing path: the v2 training scripts supersede v1 when present."""
+    return next((p for p in paths if p.exists()), paths[-1])
+
+
+TRAIN_PY = _newest(ROOT / "src" / "model" / "train_v2.py", ROOT / "src" / "model" / "train.py")
+CORPUS_PY = _newest(ROOT / "src" / "model" / "corpus" / "build_corpus_v2.py",
+                    ROOT / "src" / "model" / "corpus" / "build_corpus.py")
 CORPUS_FILE = ROOT / "data" / "corpus" / "train.jsonl"
 MODEL_DIR = ROOT / "models" / "pii_classifier"
 
@@ -63,36 +72,66 @@ def _parse_train() -> dict:
     info["train_split"] = float(m.group(1)) if m else None
     m = re.search(r"random\.seed\((\d+)\)", src)
     info["seed"] = int(m.group(1)) if m else None
+    m = re.search(r"subset_size\s*=\s*min\((\d+)", src)
+    info["subset"] = int(m.group(1)) if m else None
+    if not info["base_model"]:
+        m = re.search(r"from_pretrained\(\s*[\"']models/([^\"']+)", src)
+        info["base_model"] = m.group(1).replace("_", "/", 1) if m else None
+    info["source"] = str(TRAIN_PY.relative_to(ROOT)).replace("\\", "/")
     return info
 
 
 def _parse_corpus_builder() -> dict:
     tree = ast.parse(CORPUS_PY.read_text(encoding="utf-8"))
-    templates, loops, generators = [], None, []
+    templates, loops, generators, samples = [], None, [], None
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name.startswith("make_"):
             generators.append(node.name[5:].upper())
+        if isinstance(node, ast.FunctionDef) and node.name == "build_corpus" and node.args.defaults:
+            samples = _literal(node.args.defaults[0])
         if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "records":
             templates = [t[0] for t in (_literal(node.value) or [])]
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "TEMPLATES":
+            groups = _literal(node.value) or {}
+            templates = [t if isinstance(t, str) else t[0] for g in groups.values() for t in g]
         if (isinstance(node, ast.For) and isinstance(node.iter, ast.Call)
                 and getattr(node.iter.func, "id", None) == "range" and loops is None):
             loops = _literal(node.iter.args[0])
-    return {"templates": templates, "rounds": loops, "generators": generators,
-            "planned_sentences": len(templates) * loops if loops else None}
+    planned = samples if samples else (len(templates) * loops if isinstance(loops, int) else None)
+    return {"templates": templates, "rounds": loops if not samples else None, "generators": generators,
+            "planned_sentences": planned, "source": str(CORPUS_PY.relative_to(ROOT)).replace("\\", "/")}
+
+
+def _num_labels(config: Path) -> int | None:
+    try:
+        return len(json.loads(config.read_text())["id2label"])
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _trainer_runs() -> dict | None:
-    """Metrics from the newest HF Trainer state under models/pii_classifier."""
-    states = sorted(MODEL_DIR.glob("**/trainer_state.json"),
-                    key=lambda p: json.loads(p.read_text()).get("global_step", 0))
+    """Metrics from the newest HF Trainer state that belongs to the served model.
+
+    Checkpoints from other runs (different label set) are skipped, and logged
+    ratios outside [0, 1] are dropped as invalid rather than displayed.
+    """
+    served = _num_labels(MODEL_DIR / "config.json")
+    states = [p for p in MODEL_DIR.glob("**/trainer_state.json")
+              if served is None or _num_labels(p.parent / "config.json") in (None, served)]
+    states.sort(key=lambda p: json.loads(p.read_text()).get("global_step", 0))
     if not states:
         return None
     state = json.loads(states[-1].read_text())
     hist = state.get("log_history", [])
     train = [{"step": h["step"], "loss": h["loss"]} for h in hist if "loss" in h]
-    evals = [{k: h[k] for k in h if k == "step" or k.startswith("eval_")} for h in hist if "eval_loss" in h]
+    ratio = ("accuracy", "precision", "recall", "f1")
+    invalid = lambda k, v: any(r in k for r in ratio) and not 0 <= v <= 1  # noqa: E731
+    evals = [{k: h[k] for k in h if k == "step" or (k.startswith("eval_") and not invalid(k, h[k]))}
+             for h in hist if "eval_loss" in h]
+    dropped = sorted({f"{k}={h[k]}" for h in hist for k in h if k.startswith("eval_") and invalid(k, h[k])})
     return {"global_step": state.get("global_step"), "epochs": state.get("epoch"),
             "train_loss": train, "eval": evals, "final_eval": evals[-1] if evals else None,
+            "dropped_invalid": dropped,
             "source": str(states[-1].relative_to(ROOT)).replace("\\", "/")}
 
 
@@ -189,25 +228,51 @@ def _negative(rng: random.Random) -> str:
         badcard=bad, n6="".join(rng.choices(string.digits, k=6)))
 
 
-@lru_cache(maxsize=1)
-def evaluate_patterns(per_label: int = 60, negatives: int = 120, seed: int = 7) -> dict:
-    """Exact-span precision / recall / F1 of the pattern layer on a synthetic benchmark."""
-    rng = random.Random(seed)
-    cases = []  # (text, [(label, start, end)])
-    for label, templates in TEMPLATES.items():
-        for _ in range(per_label):
-            tpl, v = rng.choice(templates), _gen_value(label, rng)
-            text = tpl.format(v=v)
-            start = text.index(v)
-            cases.append((text, [(label, start, start + len(v))], tpl))
-    for _ in range(negatives):
-        cases.append((_negative(rng), [], None))
+# Names only the model can find: the pattern layer has no PERSON detector.
+PERSON_TEMPLATES = ["Name: {v}", "Hello {v}, your order has shipped", "Please contact {v} for details",
+                    "Account holder {v} requested a refund"]
+PERSON_NAMES = ["Priya Sharma", "Rahul Verma", "Ananya Iyer", "Arjun Mehta", "Neha Gupta", "Vikram Singh",
+                "Sara Khan", "John Miller", "Emily Carter", "Rohan Das", "Kavya Nair", "Aditya Rao"]
 
+
+def _build_cases(per_label: int, negatives: int, seed: int, with_person: bool = False) -> list:
+    """Seeded benchmark: (text, [(label, start, end)]) with one planted value per sentence."""
+    rng = random.Random(seed)
+    cases = []
+    groups = dict(TEMPLATES, **({"PERSON": PERSON_TEMPLATES} if with_person else {}))
+    for label, templates in groups.items():
+        for _ in range(per_label):
+            v = rng.choice(PERSON_NAMES) if label == "PERSON" else _gen_value(label, rng)
+            text = rng.choice(templates).format(v=v)
+            start = text.index(v)
+            cases.append((text, [(label, start, start + len(v))]))
+    for _ in range(negatives):
+        cases.append((_negative(rng), []))
+    return cases
+
+
+def _prf(t, f_p, f_n):
+    p = t / (t + f_p) if t + f_p else 1.0
+    r = t / (t + f_n) if t + f_n else 1.0
+    return {"precision": p, "recall": r, "f1": 2 * p * r / (p + r) if p + r else 0.0,
+            "tp": t, "fp": f_p, "fn": f_n}
+
+
+def _score(cases: list, run, labels: list[str]) -> dict:
+    """Score a detector (text -> [DetectionResult]) on *cases*.
+
+    exact:   label and character span both match.
+    overlap: label matches and the predicted span overlaps the gold span,
+             i.e. the value would still be redacted (what matters for leakage).
+    """
     tp, fp, fn = defaultdict(int), defaultdict(int), defaultdict(int)
+    ov_tp, ov_fn = defaultdict(int), defaultdict(int)
     misses, false_alarms = defaultdict(list), []
+    neg_flagged = 0
     t0 = time.perf_counter()
-    for text, gold, _ in cases:
-        pred = {(d.label, d.start, d.end) for d in detect(text)}
+    for text, gold in cases:
+        dets = run(text)
+        pred = {(d.label, d.start, d.end) for d in dets}
         gold_set = set(gold)
         for g in gold_set:
             if g in pred:
@@ -216,26 +281,54 @@ def evaluate_patterns(per_label: int = 60, negatives: int = 120, seed: int = 7) 
                 fn[g[0]] += 1
                 if len(misses[g[0]]) < 2:
                     misses[g[0]].append(text)
+            if any(p[0] == g[0] and p[1] < g[2] and g[1] < p[2] for p in pred):
+                ov_tp[g[0]] += 1
+            else:
+                ov_fn[g[0]] += 1
         for p in pred - gold_set:
             fp[p[0]] += 1
             if not gold and len(false_alarms) < 3:
                 false_alarms.append({"text": text, "label": p[0]})
+        neg_flagged += bool(not gold and dets)
     elapsed = (time.perf_counter() - t0) * 1000
-
-    def prf(t, f_p, f_n):
-        p = t / (t + f_p) if t + f_p else 1.0
-        r = t / (t + f_n) if t + f_n else 1.0
-        return {"precision": p, "recall": r, "f1": 2 * p * r / (p + r) if p + r else 0.0,
-                "tp": t, "fp": f_p, "fn": f_n}
-
-    per = {lab: {**prf(tp[lab], fp[lab], fn[lab]), "misses": misses[lab]} for lab in TEMPLATES}
-    neg_flagged = sum(1 for text, gold, _ in cases if not gold and detect(text))
+    per = {lab: {**_prf(tp[lab], fp[lab], fn[lab]), "misses": misses[lab],
+                 "overlap_recall": ov_tp[lab] / max(1, ov_tp[lab] + ov_fn[lab])} for lab in labels}
+    n_neg = sum(1 for _, g in cases if not g)
     return {
         "per_label": per,
-        "overall": prf(sum(tp.values()), sum(fp.values()), sum(fn.values())),
-        "negatives": {"total": negatives, "flagged": neg_flagged, "examples": false_alarms},
-        "cases": len(cases), "seed": seed, "ms_total": elapsed, "ms_per_case": elapsed / len(cases),
+        "overall": {**_prf(sum(tp.values()), sum(fp.values()), sum(fn.values())),
+                    "overlap_recall": sum(ov_tp.values()) / max(1, sum(ov_tp.values()) + sum(ov_fn.values()))},
+        "negatives": {"total": n_neg, "flagged": neg_flagged, "examples": false_alarms},
+        "cases": len(cases), "ms_total": elapsed, "ms_per_case": elapsed / len(cases),
     }
+
+
+@lru_cache(maxsize=1)
+def evaluate_patterns(per_label: int = 60, negatives: int = 120, seed: int = 7) -> dict:
+    """Exact-span precision / recall / F1 of the pattern layer on a synthetic benchmark."""
+    res = _score(_build_cases(per_label, negatives, seed), detect, list(TEMPLATES))
+    return {**res, "seed": seed}
+
+
+@lru_cache(maxsize=1)
+def evaluate_model(per_label: int = 25, negatives: int = 50, seed: int = 11) -> dict:
+    """Pattern layer vs NER model vs both, on a benchmark that also contains names.
+
+    Uses a different seed from evaluate_patterns so the two are independent
+    samples. Returns {"available": False} when the model isn't loaded.
+    """
+    st = ner.status(wait=True)
+    if st["state"] != "loaded":
+        return {"available": False, "status": st}
+    cases = _build_cases(per_label, negatives, seed, with_person=True)
+    labels = list(TEMPLATES) + ["PERSON"]
+    model_only = lambda t: ner.predict(t) or []  # noqa: E731
+    configs = {
+        "pattern": _score(cases, detect, labels),
+        "model": _score(cases, model_only, labels),
+        "ensemble": _score(cases, lambda t: detect(t, ner.predict(t)), labels),
+    }
+    return {"available": True, "status": ner.status(), "seed": seed, "cases": len(cases), "configs": configs}
 
 
 # --- canary audit -------------------------------------------------------------
@@ -269,6 +362,28 @@ def canary_audit() -> dict:
     return {"markers": len(rows), "leaked": sum(r["leaked"] for r in rows), "rows": rows}
 
 
+_warm = threading.Event()
+
+
+def warm_up() -> None:
+    """Load the model and run every benchmark once, off the request path."""
+    def run():
+        try:
+            evaluate_patterns()
+            canary_audit()
+            evaluate_model()
+        finally:
+            _warm.set()
+    threading.Thread(target=run, name="insights-warmup", daemon=True).start()
+
+
+def model_evaluation() -> dict:
+    """evaluate_model() if it's ready, else a 'measuring' placeholder (never blocks)."""
+    if not _warm.is_set():
+        return {"available": None, "status": {"state": "measuring", "detail": "benchmark running"}}
+    return evaluate_model()
+
+
 def detectors_info() -> list[dict]:
     return [{"name": n, "label": lab, "method": m, "priority": i + 1}
             for i, (n, lab, m, _) in enumerate(DETECTORS)]
@@ -286,6 +401,16 @@ def main() -> None:
     print(f"Canary: {ca['leaked']}/{ca['markers']} leaked")
     for r in ca["rows"]:
         print(f"  {r['kind']:5s} {r['output']}")
+    me = evaluate_model()
+    if not me["available"]:
+        print("Model:", me["status"])
+    for name, res in me.get("configs", {}).items():
+        o = res["overall"]
+        print(f"[{name:8s}] P={o['precision']:.3f} R={o['recall']:.3f} F1={o['f1']:.3f} "
+              f"overlapR={o['overlap_recall']:.3f} neg={res['negatives']['flagged']}/{res['negatives']['total']} "
+              f"{res['ms_per_case']:.1f} ms/case")
+        for lab, m in res["per_label"].items():
+            print(f"    {lab:6s} P={m['precision']:.2f} R={m['recall']:.2f} ovR={m['overlap_recall']:.2f} miss={m['misses'][:1]}")
     print(json.dumps(training_info(), indent=1)[:1500])
 
 
