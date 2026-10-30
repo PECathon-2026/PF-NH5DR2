@@ -87,8 +87,10 @@ VALIDATORS = {
     "IP": lambda t, s, e: ip_valid(t[s:e]) and _whole_word(t, s, e) and not t[e:e + 1] == ".",
     "URL": lambda t, s, e: bool(URL_RX.match(t[s:e])),
     "OTP": _otp_ok,
+    # Names are capitalised words ("Priya Sharma"); rejects "move", "Pune office".
     "PERSON": lambda t, s, e: (_whole_word(t, s, e) and "@" not in t[max(0, s - 1):e + 1]
-                               and all(w[:1].isalpha() for w in t[s:e].split())),
+                               and all(w[:1].isupper() and w.replace("-", "").replace(".", "").isalpha()
+                                       for w in t[s:e].split())),
 }
 
 

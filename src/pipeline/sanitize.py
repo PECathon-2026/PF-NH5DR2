@@ -70,9 +70,39 @@ def sanitize_text(text: str, detections: List[DetectionResult], typed: bool = Tr
     return "".join(out)
 
 
+def _occurrences(value: str, text: str):
+    """Whole-token occurrences of *value* in *text* (not inside a longer word/number)."""
+    for m in re.finditer(re.escape(value), text):
+        s, e = m.span()
+        if s > 0 and text[s - 1].isalnum() and value[0].isalnum():
+            continue
+        if e < len(text) and text[e].isalnum() and value[-1].isalnum():
+            continue
+        yield s, e
+
+
+def propagate(text: str, detections: List[DetectionResult]) -> List[DetectionResult]:
+    """Once a value is detected, redact every other occurrence of it too.
+
+    e.g. a name caught on line 1 is also hidden where it repeats on line 9,
+    instead of leaking there (or failing the whole document closed).
+    """
+    taken = [(d.start, d.end) for d in detections]
+    extra = []
+    for d in {d.text: d for d in detections}.values():
+        if len(d.text.strip()) < 3:
+            continue
+        for s, e in _occurrences(d.text, text):
+            if not any(s < b and a < e for a, b in taken):
+                extra.append(DetectionResult(d.text, d.label, s, e, d.confidence, "propagated"))
+                taken.append((s, e))
+    return sorted(detections + extra, key=lambda r: r.start)
+
+
 def count_leaks(sanitized: str, detections: List[DetectionResult]) -> int:
-    """Number of detected raw values that still appear in the sanitized text."""
-    return sum(1 for d in detections if d.text and d.text in sanitized)
+    """Number of detected raw values that still appear (as whole tokens) in the sanitized text."""
+    return sum(1 for d in {d.text: d for d in detections}.values()
+               if d.text and next(_occurrences(d.text, sanitized), None) is not None)
 
 
 # The NER model reads ~128 tokens at a time, so long text is sanitized in
@@ -136,12 +166,15 @@ def sanitize(text: str, typed: bool = True) -> SanitizeResult:
         traces.append(r.trace)
         dets.extend(DetectionResult(d.text, d.label, d.start + s, d.end + s, d.confidence, d.source)
                     for d in r.detections)
-    sanitized = "".join(parts)
+    n_before = len(dets)
+    dets = propagate(text, dets)  # a value found in one segment is hidden in every segment
+    sanitized = sanitize_text(text, dets, typed)
     leaked = count_leaks(sanitized, dets)  # re-check the stitched document as a whole
     if leaked:
         raise SanitizationError(f"{leaked} detected value(s) survived sanitization")
-    return SanitizeResult(text, sanitized, dets, leaked, (time.perf_counter() - t0) * 1000,
-                          _merge_traces(traces, text, sanitized, len(dets), leaked))
+    trace = _merge_traces(traces, text, sanitized, len(dets), leaked)
+    trace["merge"]["propagated"] = sum(tr["merge"].get("propagated", 0) for tr in traces) + len(dets) - n_before
+    return SanitizeResult(text, sanitized, dets, leaked, (time.perf_counter() - t0) * 1000, trace)
 
 
 def _sanitize_one(text: str, typed: bool = True) -> SanitizeResult:
@@ -152,6 +185,9 @@ def _sanitize_one(text: str, typed: bool = True) -> SanitizeResult:
         model_stage = {**ner.status(), "matches": len(model_results or []),
                        "ms": (time.perf_counter() - t) * 1000}
         detections, trace = detect_trace(text, model_results)
+        found = len(detections)
+        detections = propagate(text, detections)
+        trace["merge"]["propagated"] = len(detections) - found
     except Exception as exc:  # noqa: BLE001 - fail closed on anything
         raise SanitizationError(f"detection failed: {exc}") from exc
     t = time.perf_counter()
