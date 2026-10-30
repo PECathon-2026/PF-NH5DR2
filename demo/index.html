@@ -1,112 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="5">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PrivacyLens</title>
-<style>
-  :root {
-    --bg: #f6f5f2;
-    --panel: #ffffff;
-    --ink: #1c1b19;
-    --muted: #6d6a64;
-    --line: #e4e1da;
-    --red: #d92d20;
-    --red-soft: #fde4e1;
-    --red-ink: #8f1d14;
-    --ok: #12795b;
-    --ok-soft: #dcf3ea;
-    --chip: #1c1b19;
-    --chip-ink: #ffffff;
-    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141413; --panel: #1d1d1b; --ink: #eceae5; --muted: #9b978f; --line: #2f2e2b;
-      --red: #ff6b5e; --red-soft: #4a1c18; --red-ink: #ffc9c3;
-      --ok: #4fd1a5; --ok-soft: #123a2e; --chip: #eceae5; --chip-ink: #141413;
-      color-scheme: dark;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 48px; }
-
-  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo { width: 38px; height: 38px; border-radius: 10px; background: var(--red); display: grid; place-items: center; }
-  .logo svg { width: 22px; height: 22px; }
-  h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
-  .tag { margin: 0; color: var(--muted); font-size: 13.5px; }
-  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--ok-soft); color: var(--ok); }
-  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-  .pill.bad { background: var(--red-soft); color: var(--red); }
-
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
-  .stat b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .stat span { color: var(--muted); font-size: 12.5px; }
-  .stat.alert b { color: var(--red); }
-
-  .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; }
-  .arrow { display: grid; place-items: center; color: var(--muted); }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; min-width: 0; min-height: 420px; }
-  .phead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  .phead h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .phead h2 .n { color: var(--muted); margin-right: 6px; }
-  .pbody { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-
-  textarea { flex: 1; min-height: 260px; width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: transparent; color: var(--ink); font: 14px/1.6 var(--mono); }
-  textarea:focus { outline: 2px solid var(--red); outline-offset: -1px; border-color: transparent; }
-  .samples { display: flex; flex-wrap: wrap; gap: 6px; }
-  button { font: inherit; cursor: pointer; }
-  .sample { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; }
-  .sample:hover { border-color: var(--red); color: var(--red); }
-  .ghost { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; padding: 3px 10px; font-size: 12.5px; }
-  .ghost:hover { color: var(--ink); }
-
-  .text { font: 14px/1.75 var(--mono); white-space: pre-wrap; word-break: break-word; }
-  .empty { color: var(--muted); font-style: italic; font-family: var(--sans); }
-  mark { background: var(--red-soft); color: var(--red-ink); border-bottom: 2px solid var(--red); border-radius: 3px; padding: 1px 2px; transition: box-shadow .15s; }
-  mark sup { font: 700 9px/1 var(--sans); letter-spacing: .05em; color: var(--red); margin-left: 3px; vertical-align: 5px; }
-  mark.on { box-shadow: 0 0 0 2px var(--red); }
-  .ph { background: var(--chip); color: var(--chip-ink); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; font-weight: 600; }
-
-  .list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-  .list li { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; cursor: default; }
-  .list li:hover { background: var(--red-soft); }
-  .lbl { font: 700 11px/1 var(--sans); letter-spacing: .05em; color: var(--red); }
-  .val { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .conf { color: var(--muted); font-variant-numeric: tabular-nums; }
-
-  .err { color: var(--red); font-size: 13px; }
-  footer { margin-top: 20px; color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-  code { font-family: var(--mono); font-size: 12px; }
-
-  @media (max-width: 980px) {
-    .flow { grid-template-columns: 1fr; }
-    .arrow { transform: rotate(90deg); height: 18px; }
-    .panel { min-height: 0; }
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-</style>
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="brand">
-      <div class="logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 11h5"/></svg>
-      </div>
-      <div>
-        <h1>PrivacyLens</h1>
-        <p class="tag">Detect and redact sensitive data before it leaves the device.</p>
-      </div>
+  <div id="top"></div>
+
+  <section class="hero">
+    <div>
+      <h2>Point the <b>lens</b> at anything sensitive.</h2>
+      <p class="lead">Under the lens, every card, OTP, phone and name is already redacted by 7 validated patterns and a fine-tuned BERT model, then checked for leaks before release.</p>
+      <span class="hint">◉ Move your mouse over the card. It shows exactly what you type below.</span>
     </div>
-    <div id="status" class="pill"><span class="dot"></span><span id="statusText">Connecting…</span></div>
-  </header>
+    <div class="stage" id="stage" role="img" aria-label="Your input, with sensitive values revealed as redacted under a moving lens"></div>
+  </section>
 
   <section class="stats" aria-label="Summary">
     <div class="stat"><b id="sCount">0</b><span>sensitive spans</span></div>
@@ -145,41 +56,17 @@
     </div>
   </section>
 
-  <footer>
-    <span>Detection: regex + Luhn checksum, run by <span id="where">the local Python backend</span>.</span>
-    <span>Types: CARD · PHONE · PAN · EMAIL · IP · URL · OTP</span>
-    <span>API: <code>POST /api/sanitize</code></span>
-  </footer>
+  <p style="margin:16px 0 0"><a class="cta" href="/pipeline">See how this exact input moves through the pipeline →</a></p>
+
+  <div class="next" id="next"></div>
+  <footer id="foot"></footer>
 </div>
 
+<script src="/static/common.js"></script>
 <script>
-const SAMPLES = {
-  "Checkout form": "Name: Priya Sharma\nCard number: 4532 0151 1283 0366\nExpiry: 09/28\nPhone: +91 98765 43210\nEmail: priya.sharma@example.com",
-  "Bank SMS": "Your OTP is 482913 for txn of Rs 2,499 at AMAZON. Do not share. If not you, call 1800-123-4567 or visit https://bank.example.com/report",
-  "KYC upload": "PAN: ABCDE1234F\nRegistered mobile 9876543210\nLogin from IP 203.0.113.42 at 10:42",
-  "Support chat": "hey, my card 4111-1111-1111-1111 got declined. reach me at test@example.com or 9123456789. verification code 0042",
-};
-
-const $ = (id) => document.getElementById(id);
-const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-const WHERE = LOCAL ? "Local" : "Hosted demo";
-$("where").textContent = LOCAL ? "the local Python backend" : "this demo's server (in real use it runs on-device)";
 const input = $("input");
-let lastText = null, timer = null, seq = 0, latest = null;
-
-const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-for (const [name, text] of Object.entries(SAMPLES)) {
-  const b = document.createElement("button");
-  b.className = "sample"; b.textContent = name;
-  b.onclick = () => { input.value = text; run(true); };
-  $("samples").appendChild(b);
-}
-
-function setStatus(ok, text) {
-  $("status").classList.toggle("bad", !ok);
-  $("statusText").textContent = text;
-}
+const lensView = lens($("stage"));
+let latest = null;
 
 function renderHighlight(text, dets) {
   if (!text) return '<span class="empty">Detected spans appear here.</span>';
@@ -192,15 +79,11 @@ function renderHighlight(text, dets) {
   return html + esc(text.slice(cur));
 }
 
-function renderOutput(s) {
-  if (!s) return '<span class="empty">Safe-to-share text appears here.</span>';
-  return esc(s).replace(/\[REDACTED:([A-Z]+)\]/g, '<span class="ph">[REDACTED:$1]</span>');
-}
-
 function render(res) {
   latest = res;
   const dets = res.detections;
   $("highlight").innerHTML = renderHighlight(res.original, dets);
+  lensView.show(res.original, dets);
   $("output").innerHTML = renderOutput(res.sanitized);
   $("list").innerHTML = dets.map((d, i) =>
     `<li data-i="${i}"><span class="lbl">${d.label}</span><span class="val" title="${esc(d.text)}">${esc(d.text)}</span><span class="conf">${Math.round(d.confidence * 100)}%</span></li>`
@@ -213,38 +96,18 @@ function render(res) {
   $("sLeak").textContent = `${res.leaked} / ${dets.length}`;
   $("leakStat").classList.toggle("alert", res.leaked > 0);
   $("err").hidden = true;
-  setStatus(res.leaked === 0, res.leaked === 0 ? `${WHERE} · 0 leaks` : `${res.leaked} leaked`);
 }
 
-async function run(now) {
-  clearTimeout(timer);
-  const go = async () => {
-    const text = input.value;
-    if (text === lastText) return;
-    lastText = text;
-    const id = ++seq;
-    try {
-      const r = await fetch("/api/sanitize", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const body = await r.json();
-      if (id !== seq) return;
-      if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request rejected");
-      render(body);
-    } catch (e) {
-      if (id !== seq) return;
-      lastText = null;
-      $("output").innerHTML = '<span class="empty">Output withheld.</span>';
-      $("err").textContent = e.message || "Backend unreachable";
-      $("err").hidden = false;
-      setStatus(false, "Blocked");
-    }
-  };
-  now ? go() : (timer = setTimeout(go, 180));
-}
+const run = liveSanitize(input, {
+  onResult: render,
+  onError: (e) => {
+    $("output").innerHTML = '<span class="empty">Output withheld.</span>';
+    $("err").textContent = e.message || "Backend unreachable";
+    $("err").hidden = false;
+  },
+});
 
-input.addEventListener("input", () => run(false));
+addSamples($("samples"), (text) => { input.value = text; run(true); });
 $("clear").onclick = () => { input.value = ""; run(true); input.focus(); };
 $("copy").onclick = async () => {
   if (!latest || !latest.sanitized) return;
@@ -262,8 +125,7 @@ function linkHover(e, on) {
 $("list").addEventListener("mouseover", (e) => linkHover(e, true));
 $("list").addEventListener("mouseout", (e) => linkHover(e, false));
 
-fetch("/api/health").then((r) => r.ok && setStatus(true, `${WHERE} · 0 leaks`)).catch(() => setStatus(false, "Backend offline"));
-input.value = SAMPLES["Checkout form"];
+input.value = lastInput.get() || SAMPLES["Checkout form"];
 run(true);
 </script>
 </body>
