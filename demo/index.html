@@ -10,6 +10,15 @@
 <div class="wrap">
   <div id="top"></div>
 
+  <section class="hero">
+    <div>
+      <h2>Point the <b>lens</b> at anything sensitive.</h2>
+      <p class="lead">Under the lens, every card, OTP, phone and name is already redacted by 7 validated patterns and a fine-tuned BERT model, then checked for leaks before release.</p>
+      <span class="hint">◉ Move your mouse over the card. It shows exactly what you type below.</span>
+    </div>
+    <div class="stage" id="stage" role="img" aria-label="Your input, with sensitive values revealed as redacted under a moving lens"></div>
+  </section>
+
   <section class="stats" aria-label="Summary">
     <div class="stat"><b id="sCount">0</b><span>sensitive spans</span></div>
     <div class="stat"><b id="sTypes">—</b><span>types found</span></div>
@@ -56,6 +65,7 @@
 <script src="/static/common.js"></script>
 <script>
 const input = $("input");
+const lensView = lens($("stage"));
 let latest = null;
 
 function renderHighlight(text, dets) {
@@ -73,6 +83,7 @@ function render(res) {
   latest = res;
   const dets = res.detections;
   $("highlight").innerHTML = renderHighlight(res.original, dets);
+  lensView.show(res.original, dets);
   $("output").innerHTML = renderOutput(res.sanitized);
   $("list").innerHTML = dets.map((d, i) =>
     `<li data-i="${i}"><span class="lbl">${d.label}</span><span class="val" title="${esc(d.text)}">${esc(d.text)}</span><span class="conf">${Math.round(d.confidence * 100)}%</span></li>`
@@ -114,7 +125,7 @@ function linkHover(e, on) {
 $("list").addEventListener("mouseover", (e) => linkHover(e, true));
 $("list").addEventListener("mouseout", (e) => linkHover(e, false));
 
-input.value = lastInput.get() ?? SAMPLES["Checkout form"];
+input.value = lastInput.get() || SAMPLES["Checkout form"];
 run(true);
 </script>
 </body>

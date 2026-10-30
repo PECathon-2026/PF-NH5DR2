@@ -104,7 +104,7 @@ const run = liveSanitize(input, {
 addSamples($("samples"), (text) => { input.value = text; run(true); });
 
 renderArch(null);
-input.value = lastInput.get() ?? SAMPLES["Checkout form"];
+input.value = lastInput.get() || SAMPLES["Checkout form"];
 run(true);
 </script>
 </body>

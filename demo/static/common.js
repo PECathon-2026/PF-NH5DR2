@@ -27,10 +27,8 @@ function renderChrome() {
   const here = location.pathname.replace(/\/$/, "") || "/";
   $("top").innerHTML = `
     <header>
-      <a class="brand" href="/" style="text-decoration:none;color:inherit">
-        <div class="logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 11h5"/></svg>
-        </div>
+      <a class="brand" href="/">
+        <div class="logo" aria-hidden="true"></div>
         <div><h1>PrivacyLens</h1><p class="tag">Detect and redact sensitive data before it leaves the device.</p></div>
       </a>
       <div id="status" class="pill"><span class="dot"></span><span id="statusText">Connecting…</span></div>
@@ -108,6 +106,49 @@ function liveSanitize(textarea, { onResult, onError }) {
   return run;
 }
 
+// Floating sparks behind every page (decorative).
+function sparks(n = 14) {
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("i");
+    p.className = "pt"; p.setAttribute("aria-hidden", "true");
+    p.style.left = `${Math.random() * 100}vw`;
+    p.style.animationDuration = `${8 + Math.random() * 12}s`;
+    p.style.animationDelay = `${-Math.random() * 20}s`;
+    document.body.appendChild(p);
+  }
+}
+
+// The lens: raw text underneath, the sanitized view revealed inside a moving
+// circle. Redaction bars are the same width as the text they hide.
+function lens(stage) {
+  stage.innerHTML = '<div class="layer raw"></div><div class="layer safe" aria-hidden="true"></div><div class="ring" aria-hidden="true"></div><div class="fade" aria-hidden="true"></div>';
+  const raw = stage.querySelector(".raw"), safe = stage.querySelector(".safe");
+  const at = (x, y) => { stage.style.setProperty("--x", `${x}px`); stage.style.setProperty("--y", `${y}px`); stage.style.setProperty("--r", "90px"); };
+  // Idle: orbit over the text itself (not the empty part of the card).
+  let t = 0, auto = setInterval(() => {
+    t += 0.03;
+    const h = Math.min(stage.clientHeight, raw.scrollHeight), w = stage.clientWidth;
+    at(w / 2 + Math.cos(t) * Math.min(190, w / 3), h / 2 + Math.sin(t * 1.3) * Math.max(8, Math.min(80, h / 2 - 40)));
+  }, 30);
+  const stop = () => { clearInterval(auto); auto = null; };
+  const move = (e) => { const r = stage.getBoundingClientRect(); at(e.clientX - r.left, e.clientY - r.top); };
+  stage.addEventListener("pointerenter", stop);
+  stage.addEventListener("pointermove", move);
+  stage.addEventListener("pointerdown", (e) => { stop(); move(e); });
+  return {
+    show(text, dets) {
+      let html = "", cur = 0;
+      for (const d of dets) {
+        html += esc(text.slice(cur, d.start)) + `<span class="s" data-l="${esc(d.label)}">${esc(text.slice(d.start, d.end))}</span>`;
+        cur = d.end;
+      }
+      html += esc(text.slice(cur));
+      raw.innerHTML = text ? html : '<span class="empty">Type something below to inspect it…</span>';
+      safe.innerHTML = text ? html : "";
+    },
+  };
+}
+
 let _pipeline = null;
 const getPipeline = () => (_pipeline ??= fetch("/api/pipeline").then((r) => {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -115,3 +156,4 @@ const getPipeline = () => (_pipeline ??= fetch("/api/pipeline").then((r) => {
 }));
 
 renderChrome();
+sparks();
