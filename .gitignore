@@ -66,3 +66,11 @@ Desktop.ini
 $RECYCLE.BIN/
 *.log
 .DS_Store
+
+# Large generated artifacts (tracked via git-lfs)
+# /models/
+# /data/corpus/
+# /tmp/
+*.whl
+*.tar.gz
+*.zip
