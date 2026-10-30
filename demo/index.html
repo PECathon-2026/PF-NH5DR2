@@ -13,7 +13,7 @@
   <section class="hero">
     <div>
       <h2>Point the <b>lens</b> at anything sensitive.</h2>
-      <p class="lead">Under the lens, every card, OTP, phone and name is already redacted by 7 validated patterns and a fine-tuned BERT model, then checked for leaks before release.</p>
+      <p class="lead" id="lead">Under the lens, every card, OTP, phone and name is already redacted by 7 validated patterns and a fine-tuned BERT model, then checked for leaks before release.</p>
       <span class="hint">◉ Move your mouse over the card. It shows exactly what you type below.</span>
     </div>
     <div class="stage" id="stage" role="img" aria-label="Your input, with sensitive values revealed as redacted under a moving lens"></div>
@@ -79,9 +79,18 @@ function renderHighlight(text, dets) {
   return html + esc(text.slice(cur));
 }
 
+// The hero copy follows what the server is actually running.
+const LEAD = {
+  loaded: "Under the lens, every card, OTP, phone and name is already redacted by 7 validated patterns and a fine-tuned BERT model, then checked for leaks before release.",
+  loading: "Under the lens, cards, OTPs, phones, emails, PAN, IPs and URLs are redacted by 7 validated patterns. The BERT model for names is still loading and joins in a few seconds.",
+  off: "Under the lens, cards, OTPs, phones, emails, PAN, IPs and URLs are redacted by 7 validated patterns, then checked for leaks before release. The BERT model that also catches names isn't running on this server; run the demo locally to see it.",
+};
+
 function render(res) {
   latest = res;
   const dets = res.detections;
+  const state = res.trace && res.trace.model ? res.trace.model.state : "off";
+  $("lead").textContent = LEAD[state] || LEAD.off;
   $("highlight").innerHTML = renderHighlight(res.original, dets);
   lensView.show(res.original, dets);
   $("output").innerHTML = renderOutput(res.sanitized);
