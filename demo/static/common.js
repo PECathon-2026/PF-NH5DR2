@@ -161,6 +161,19 @@ function lens(stage) {
   };
 }
 
+// ---- private knowledge base -------------------------------------------------
+// A random id per browser scopes the server-side RAG index, so visitors of a
+// shared deployment never see (or clear) each other's documents.
+const SID = (() => {
+  const make = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Math.random().toString(36).slice(2) + Date.now().toString(36));
+  try {
+    let s = localStorage.getItem("pl:sid");
+    if (!s || !/^[A-Za-z0-9_-]{8,64}$/.test(s)) { s = make(); localStorage.setItem("pl:sid", s); }
+    return s;
+  } catch { return (window._plSid ??= make()); }
+})();
+const ragFetch = (url, opts = {}) => fetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-PL-Session": SID } });
+
 // ---- PDFs -----------------------------------------------------------------
 const SAMPLE_PDFS = { "Bank statement PDF": "bank_statement.pdf", "KYC form PDF": "kyc_form.pdf" };
 
@@ -169,7 +182,7 @@ async function uploadPdf(blob, name, index = true) {
   const fd = new FormData();
   fd.append("file", blob, name);
   fd.append("index", String(index));
-  const r = await fetch("/api/document", { method: "POST", body: fd });
+  const r = await ragFetch("/api/document", { method: "POST", body: fd });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
   return body;

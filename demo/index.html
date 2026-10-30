@@ -145,7 +145,7 @@ function enterDoc(d) {
   $("docName").textContent = d.name;
   const types = Object.keys(d.by_label).join(", ") || "none";
   $("docMeta").innerHTML = `${d.detections} sensitive values on ${d.page_count} page${d.page_count === 1 ? "" : "s"} (${esc(types)}) · ${d.leaked} leaked` +
-    (d.indexed ? ` · <a href="/ask">indexed for Ask documents →</a>` : "") + (d.truncated ? " · first 30 pages only" : "");
+    (d.indexed ? ` · <a href="/ask">indexed for Ask documents →</a>` : d.index_error ? ` · ${esc(d.index_error)}` : "") + (d.truncated ? " · first 30 pages only" : "");
   setStatus(d.leaked === 0, d.leaked === 0 ? `${WHERE} · 0 leaks` : `${d.leaked} leaked`);
   showPage(0);
 }

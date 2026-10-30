@@ -5,7 +5,8 @@
            extractive fallback -> output scan (sanitize the answer again)
 
 Raw text never enters the index or the LLM prompt: both only ever see
-[REDACTED:TYPE] placeholders. The index lives in memory for the demo.
+[REDACTED:TYPE] placeholders. Each visitor (X-PL-Session id) gets a
+separate in-memory index that expires after 3 idle hours.
 
 Config (env): OLLAMA_URL (default http://localhost:11434), RAG_MODEL
 (default qwen2.5:3b), RAG_LLM=0 to force the extractive fallback.
@@ -129,16 +130,60 @@ class Index:
                      "text": c["text"], "score": round(s, 3)} for s, c in scored[:k]]
 
 
-INDEX = Index()
+# ---- one private index per visitor ----------------------------------------
+# The browser sends a random id (X-PL-Session); each id gets its own index,
+# so visitors of a shared deployment never see each other's documents.
+SESSION_RX = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+LOCAL = "local"  # CLI / requests without an id
+MAX_SESSIONS, SESSION_TTL, MAX_DOCS = 500, 3 * 3600, 20
 
 
-def ingest_pages(name: str, sanitized_pages: list[str], redactions: int, kind: str = "pdf") -> dict:
-    return INDEX.add(name, sanitized_pages, redactions, kind)
+class TooManyDocuments(ValueError):
+    pass
 
 
-def ingest_text(name: str, text: str) -> dict:
+class Sessions:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.items: dict[str, list] = {}  # sid -> [Index, last_used]
+
+    def get(self, sid: str | None) -> Index:
+        sid = sid if sid and SESSION_RX.match(sid) else LOCAL
+        now = time.time()
+        with self.lock:
+            for k in [k for k, (_, t) in self.items.items() if now - t > SESSION_TTL]:
+                del self.items[k]
+            if sid not in self.items and len(self.items) >= MAX_SESSIONS:
+                del self.items[min(self.items, key=lambda k: self.items[k][1])]
+            entry = self.items.setdefault(sid, [Index(), now])
+            entry[1] = now
+            return entry[0]
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+
+SESSIONS = Sessions()
+
+
+def index_for(sid: str | None = None) -> Index:
+    return SESSIONS.get(sid)
+
+
+def _add(sid, name, pages, redactions, kind) -> dict:
+    idx = index_for(sid)
+    if len(idx.docs) >= MAX_DOCS and not any(d["name"] == name for d in idx.docs.values()):
+        raise TooManyDocuments(f"Your knowledge base holds up to {MAX_DOCS} documents. Remove one first.")
+    return idx.add(name, pages, redactions, kind)
+
+
+def ingest_pages(name: str, sanitized_pages: list[str], redactions: int, kind: str = "pdf", sid: str | None = None) -> dict:
+    return _add(sid, name, sanitized_pages, redactions, kind)
+
+
+def ingest_text(name: str, text: str, sid: str | None = None) -> dict:
     r = sanitize(text)
-    return {**INDEX.add(name, [r.sanitized], len(r.detections), "message"), "sanitize": r.to_dict()}
+    return {**_add(sid, name, [r.sanitized], len(r.detections), "message"), "sanitize": r.to_dict()}
 
 
 # ---- generation ---------------------------------------------------------------
@@ -160,7 +205,7 @@ def llm_status() -> dict:
             return {"available": True, "model": RAG_MODEL, "detail": "Ollama, on this machine"}
         return {"available": False, "detail": f"Ollama running but model {RAG_MODEL} isn't pulled"}
     except Exception:  # noqa: BLE001
-        return {"available": False, "detail": "no local LLM (Ollama) reachable"}
+        return {"available": False, "detail": "Ollama isn't reachable from this server"}
 
 
 def _generate(question: str, hits: list[dict]) -> tuple[str, dict]:
@@ -185,14 +230,15 @@ def _generate(question: str, hits: list[dict]) -> tuple[str, dict]:
     return answer, {"kind": "extractive", **status}
 
 
-def ask(question: str, k: int = 4) -> dict:
+def ask(question: str, k: int = 4, sid: str | None = None) -> dict:
+    index = index_for(sid)
     t0 = time.perf_counter()
     q = sanitize(question)  # the question itself can contain PII
     t_q = time.perf_counter()
-    hits = INDEX.search(q.sanitized, k)
+    hits = index.search(q.sanitized, k)
     t_r = time.perf_counter()
     if not hits:
-        answer, gen = ("Nothing in the indexed documents matches that question." if INDEX.chunks
+        answer, gen = ("Nothing in the indexed documents matches that question." if index.chunks
                        else "No documents indexed yet. Upload a PDF or add a message first."), {"kind": "none"}
     else:
         answer, gen = _generate(q.sanitized, hits)
@@ -208,7 +254,7 @@ def ask(question: str, k: int = 4) -> dict:
         "timings_ms": {"sanitize_question": round((t_q - t0) * 1000, 1), "retrieve": round((t_r - t_q) * 1000, 2),
                        "generate": round((t_g - t_r) * 1000, 1), "output_scan": round((t_s - t_g) * 1000, 1),
                        "total": round((t_s - t0) * 1000, 1)},
-        "index": {"docs": len(INDEX.docs), "chunks": len(INDEX.chunks)},
+        "index": {"docs": len(index.docs), "chunks": len(index.chunks)},
     }
 
 

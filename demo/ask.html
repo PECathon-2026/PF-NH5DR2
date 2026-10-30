@@ -25,7 +25,7 @@
     <div class="ask-grid">
       <div class="card kb">
         <div class="kb-head"><h3>Knowledge base</h3><button class="ghost" id="clearAll">Clear all</button></div>
-        <p class="miss" style="margin:0 0 10px">Only sanitized text is stored. Raw text never leaves the upload request.</p>
+        <p class="miss" style="margin:0 0 10px">Private to this browser: other visitors can't see or clear it. Only sanitized text is stored, and it expires after 3 idle hours.</p>
         <div class="kb-actions">
           <label class="filebtn">Upload PDF<input type="file" id="pdf" accept="application/pdf,.pdf"></label>
         </div>
@@ -73,7 +73,7 @@ function inspectable() {
 }
 
 async function refreshKb() {
-  const r = await fetch("/api/rag").then((x) => x.json());
+  const r = await ragFetch("/api/rag").then((x) => x.json());
   const local = inspectable();
   $("docs").innerHTML = r.docs.length ? r.docs.map((d) =>
     `<li><div><b>${esc(d.name)}</b><span class="miss">${d.kind === "pdf" ? `${d.pages} page${d.pages === 1 ? "" : "s"} · ` : "message · "}${d.chunks} chunk${d.chunks === 1 ? "" : "s"} · <span class="red">${d.redactions} redacted</span></span>
@@ -84,16 +84,16 @@ async function refreshKb() {
   $("llmNote").className = `note${llm.available ? " ok" : ""}`;
   $("llmNote").innerHTML = llm.available
     ? `Answers are written by <b>${esc(llm.model)}</b> running locally (${esc(llm.detail)}). It only ever sees redacted text.`
-    : `No local LLM here (${esc(llm.detail)}), so answers quote the best-matching sanitized passage instead.`;
+    : `No local LLM on this server (${esc(llm.detail)}), so answers quote the best-matching sanitized passage instead. Run the demo locally with Ollama for written answers.`;
 }
 
 $("docs").addEventListener("click", async (e) => {
   const id = e.target.dataset.del;
   if (!id) return;
-  await fetch(`/api/rag/docs/${id}`, { method: "DELETE" });
+  await ragFetch(`/api/rag/docs/${id}`, { method: "DELETE" });
   refreshKb();
 });
-$("clearAll").onclick = async () => { await fetch("/api/rag/docs", { method: "DELETE" }); refreshKb(); };
+$("clearAll").onclick = async () => { await ragFetch("/api/rag/docs", { method: "DELETE" }); refreshKb(); };
 
 async function onPdf(blob, name) {
   $("busy").hidden = false; $("kbErr").hidden = true;
@@ -101,6 +101,7 @@ async function onPdf(blob, name) {
   try {
     const d = await uploadPdf(blob, name, true);
     try { sessionStorage.setItem("pl:doc", JSON.stringify(d)); } catch {}
+    if (d.index_error) { $("kbErr").textContent = d.index_error; $("kbErr").hidden = false; }
     await refreshKb();
   } catch (e) { $("kbErr").textContent = e.message; $("kbErr").hidden = false; }
   finally { $("busy").hidden = true; }
@@ -111,7 +112,7 @@ $("addMsg").onclick = async () => {
   const text = $("msg").value.trim();
   if (!text) { $("kbErr").textContent = "Paste a message first."; $("kbErr").hidden = false; return; }
   $("kbErr").hidden = true;
-  const r = await fetch("/api/rag/text", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Message: ${text.slice(0, 32)}…`, text }) });
+  const r = await ragFetch("/api/rag/text", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Message: ${text.slice(0, 32)}…`, text }) });
   if (!r.ok) { $("kbErr").textContent = "Couldn't add that message."; $("kbErr").hidden = false; return; }
   $("msg").value = "";
   refreshKb();
@@ -154,7 +155,7 @@ async function ask(question) {
   const wait = addBubble('<div class="busy">Sanitizing your question, searching, writing an answer…</div>', "bot");
   $("askForm").querySelector("button").disabled = true;
   try {
-    const r = await fetch("/api/rag/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+    const r = await ragFetch("/api/rag/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
     const body = await r.json();
     if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request failed");
     const q = body.question;

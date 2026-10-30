@@ -6,7 +6,7 @@ Endpoints:
   GET  /static/*       -> demo/static (shared CSS/JS)
   POST /api/sanitize   -> {"text": "..."} -> original, sanitized, detections, leaked
   POST /api/document   -> multipart PDF -> per-page sanitize results (+ indexed for RAG)
-  GET  /api/rag        -> indexed documents + local LLM status
+  GET  /api/rag        -> this visitor's documents + local LLM status (scoped by X-PL-Session)
   POST /api/rag/ask    -> {"question": "..."} -> sanitized question, retrieved chunks, answer
   POST /api/rag/text   -> {"name", "text"} -> index a message
   DELETE /api/rag/docs[/{id}] -> remove one / all documents
@@ -23,7 +23,7 @@ import os
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -117,9 +117,12 @@ def api_sanitize(req: SanitizeRequest) -> dict:
 BLOCKED = "Blocked: the document could not be safely sanitized."
 
 
+SessionId = Header(default="", alias="X-PL-Session", description="Random per-browser id; scopes the RAG index")
+
+
 @app.post("/api/document")
-def api_document(file: UploadFile = File(...), index: bool = Form(True)) -> dict:
-    """Sanitize a PDF page by page; optionally add the sanitized pages to the RAG index."""
+def api_document(file: UploadFile = File(...), index: bool = Form(True), sid: str = SessionId) -> dict:
+    """Sanitize a PDF page by page; optionally add the sanitized pages to this visitor's RAG index."""
     data = file.file.read(MAX_BYTES + 1)
     try:
         doc = process_pdf(data)
@@ -131,43 +134,49 @@ def api_document(file: UploadFile = File(...), index: bool = Form(True)) -> dict
     name = os.path.basename(file.filename or "document.pdf")[:120]
     doc["name"] = name
     if index:
-        doc["indexed"] = rag.ingest_pages(name, [p["sanitized"] for p in doc["pages"]], doc["detections"])
+        try:
+            doc["indexed"] = rag.ingest_pages(name, [p["sanitized"] for p in doc["pages"]], doc["detections"], sid=sid)
+        except rag.TooManyDocuments as exc:
+            doc["index_error"] = str(exc)
     return doc
 
 
 @app.get("/api/rag")
-def api_rag() -> dict:
-    return {"docs": sorted(rag.INDEX.docs.values(), key=lambda d: d["added"]),
-            "chunks": len(rag.INDEX.chunks), "llm": rag.llm_status()}
+def api_rag(sid: str = SessionId) -> dict:
+    idx = rag.index_for(sid)
+    return {"docs": sorted(idx.docs.values(), key=lambda d: d["added"]),
+            "chunks": len(idx.chunks), "llm": rag.llm_status(), "private": True}
 
 
 @app.post("/api/rag/ask")
-def api_rag_ask(req: AskRequest) -> dict:
+def api_rag_ask(req: AskRequest, sid: str = SessionId) -> dict:
     try:
-        return rag.ask(req.question, req.k)
+        return rag.ask(req.question, req.k, sid=sid)
     except SanitizationError as exc:
         logger.error("rag blocked: %s", exc)
         raise HTTPException(status_code=422, detail="Blocked: the question or answer could not be safely sanitized.")
 
 
 @app.post("/api/rag/text")
-def api_rag_text(req: TextDoc) -> dict:
+def api_rag_text(req: TextDoc, sid: str = SessionId) -> dict:
     try:
-        return rag.ingest_text(req.name, req.text)
+        return rag.ingest_text(req.name, req.text, sid=sid)
     except SanitizationError:
         raise HTTPException(status_code=422, detail=BLOCKED)
+    except rag.TooManyDocuments as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.delete("/api/rag/docs/{doc_id}")
-def api_rag_delete(doc_id: str) -> dict:
-    if not rag.INDEX.remove(doc_id):
+def api_rag_delete(doc_id: str, sid: str = SessionId) -> dict:
+    if not rag.index_for(sid).remove(doc_id):
         raise HTTPException(status_code=404, detail="No such document.")
     return {"ok": True}
 
 
 @app.delete("/api/rag/docs")
-def api_rag_clear() -> dict:
-    rag.INDEX.clear()
+def api_rag_clear(sid: str = SessionId) -> dict:
+    rag.index_for(sid).clear()
     return {"ok": True}
 
 
